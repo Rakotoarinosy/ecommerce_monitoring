@@ -9,7 +9,8 @@ load_dotenv()  # Charger les variables d'environnement
 # Configuration MongoDB
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 mongo_client = MongoClient(MONGO_URI)
-db = mongo_client["ecommerce_db"]  # Base de données principale
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "ecommerce_db")
+db = mongo_client[MONGO_DB_NAME]  # Base de données principale
 
 # Configuration Redis
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
