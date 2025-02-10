@@ -1,0 +1,17 @@
+# backend/app/config.py
+from pymongo import MongoClient
+import redis
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Charger les variables d'environnement
+
+# Configuration MongoDB
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+mongo_client = MongoClient(MONGO_URI)
+db = mongo_client["ecommerce_db"]  # Base de données principale
+
+# Configuration Redis
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)

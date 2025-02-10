@@ -1,0 +1,37 @@
+version: '1.0'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - mongodb
+      - redis
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+
+  mongodb:
+    image: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+    - mongodb_data:/data/db
+
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+    volumes:
+    - redis_data:/data
+
+volumes:
+  mongodb_data:
+  redis_data:
