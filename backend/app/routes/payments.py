@@ -1,16 +1,17 @@
+from datetime import datetime
 import json
 import os
 from fastapi import APIRouter, HTTPException, Request
 import stripe
 from app.models import Payment
-from app.config import db
+from app.config import db, redis_client
 from app.services.payment_service import create_stripe_payment
 
 router = APIRouter()
 # 🔹 Configuration Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
-WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET") 
 
 # ✅ Route pour récupérer tous les paiements
 @router.get("/")
@@ -31,9 +32,45 @@ def create_payment(user_id: str, amount: float):
 
     return {"message": "Paiement Stripe initié", "client_secret": client_secret, "payment": payment.to_dict()}
 
+def serialize_payment(payment):
+    # Assurez-vous que 'created_at' est un objet datetime, sinon il pourrait s'agir d'une chaîne ou null
+    created_at = payment.get("created_at")
+    
+    if isinstance(created_at, datetime):
+        created_at_iso = created_at.isoformat()
+    elif isinstance(created_at, str):
+        try:
+            created_at_obj = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")  # Adaptez le format si nécessaire
+            created_at_iso = created_at_obj.isoformat()
+        except ValueError:
+            created_at_iso = None  # Si la chaîne n'est pas dans le bon format, mettez la valeur à None
+    elif created_at is None:
+        created_at_iso = None  # Si 'created_at' est null, vous pouvez le définir sur None ou une valeur par défaut
+    else:
+        created_at_iso = None  # Pour tout autre type inattendu, définissez à None
+
+    # Vérifiez si l'ID existe et est valide
+    payment_id = payment.get("id")
+    if payment_id is None:
+        payment_id = str(payment.get("_id"))  # Essayez de récupérer l'_id si l'id n'est pas présent
+
+    return {
+        "id": str(payment_id),  # Assurez-vous que l'id est une chaîne valide
+        "amount": payment.get("amount"),
+        "status": payment.get("status"),
+        "created_at": created_at_iso,  # Vous pouvez définir une valeur par défaut ici si nécessaire
+    }
+
+@router.get("/recent")
+async def get_recent_payments():
+    payments = db.payments.find().sort("created_at", -1).limit(10)
+    serialized_payments = [serialize_payment(p) for p in payments]
+    redis_client.setex("recent_payments", 600, json.dumps(serialized_payments))
+    return serialized_payments
+
 # ✅ Route pour récupérer un paiement spécifique
 @router.get("/{payment_id}")
-def get_payment(payment_id: str):
+async def get_payment_by_id(payment_id: str):
     payment = db.payments.find_one({"_id": payment_id}, {"_id": 0})
     if not payment:
         raise HTTPException(status_code=404, detail="Paiement non trouvé")
