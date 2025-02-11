@@ -4,14 +4,16 @@ import os
 from fastapi import APIRouter, HTTPException, Request
 import stripe
 from app.models import Payment
-from app.config import db, redis_client
+from app.config import db, redis_client, logger
 from app.services.payment_service import create_stripe_payment
+from app.routes.websockets import notify_payment_clients
 
 router = APIRouter()
 # 🔹 Configuration Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET") 
+
 
 # ✅ Route pour récupérer tous les paiements
 @router.get("/")
@@ -21,14 +23,27 @@ def get_payments():
 
 # ✅ Route pour initier un paiement avec Stripe
 @router.post("/stripe")
-def create_payment(user_id: str, amount: float):
+async def create_payment(user_id: str, amount: float):
+    logger.info(f"Création d'un paiement pour user_id={user_id}, montant={amount}")
     client_secret = create_stripe_payment(amount)
     if not client_secret:
+        logger.error("Échec de la création du paiement Stripe")
         raise HTTPException(status_code=500, detail="Échec de création du paiement Stripe")
 
     # Sauvegarde en base avec `pending`
     payment = Payment(user_id=user_id, amount=amount, status="pending")
     payment.save()
+    logger.info(f"Paiement Stripe créé avec succès pour user_id={user_id}, montant={amount}")
+
+    # ✅ Vérification : Afficher un message avant la notification WebSocket
+    logger.info(f"🔹 Envoi d'une notification WebSocket pour user_id={user_id}")
+
+    # ✅ Correction : `await` est nécessaire
+    await notify_payment_clients({
+        "user_id": user_id,
+        "amount": amount,
+        "status": "pending",
+    })
 
     return {"message": "Paiement Stripe initié", "client_secret": client_secret, "payment": payment.to_dict()}
 
@@ -140,27 +155,31 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
-    if not WEBHOOK_SECRET:
-        raise HTTPException(status_code=400, detail="❌ STRIPE_WEBHOOK_SECRET non configuré")
-
     try:
-        # ✅ Vérification de la signature Stripe
         event = stripe.Webhook.construct_event(payload, sig_header, WEBHOOK_SECRET)
+        logger.info(f"Webhook reçu de Stripe, type d'événement: {event['type']}")
     except ValueError:
+        logger.error("Payload Stripe invalide")
         raise HTTPException(status_code=400, detail="⚠️ Invalid payload")
     except stripe.error.SignatureVerificationError:
+        logger.error("Signature Stripe invalide")
         raise HTTPException(status_code=400, detail="⚠️ Invalid signature")
 
-    # 🎯 Gérer les événements Stripe
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         user_id = session.get("metadata", {}).get("user_id")
 
         if user_id:
-            # ✅ Mettre à jour la base de données avec `success`
             db.payments.update_one({"user_id": user_id}, {"$set": {"status": "success"}})
-            print(f"✅ Paiement réussi pour user_id: {user_id}")
-        else:
-            print("⚠️ Aucun user_id trouvé dans la session.")
+            logger.info(f"✅ Paiement réussi pour user_id: {user_id}")
 
+            # Notifier les clients via WebSocket
+            payment_data = {
+                "user_id": user_id,
+                "amount": session["amount_total"] / 100,
+                "status": "success",
+            }
+            notify_payment_clients(payment_data)
+        else:
+            logger.warning("⚠️ Aucun user_id trouvé dans la session.")
     return {"status": "success"}
