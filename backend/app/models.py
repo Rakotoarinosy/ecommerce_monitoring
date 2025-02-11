@@ -28,7 +28,7 @@ class Payment:
     def __init__(self, user_id: str, amount: float, status: StatusEnum):
         self.user_id = user_id
         self.amount = amount
-        self.status = status.value 
+        self.status = status if isinstance(status, str) else status.value
         self.created_at = datetime.utcnow()
 
     def to_dict(self):
