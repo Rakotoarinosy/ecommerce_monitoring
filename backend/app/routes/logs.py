@@ -1,25 +1,73 @@
 from datetime import datetime
 import json
+from typing import List
+from pydantic import BaseModel
 from fastapi import APIRouter
 from app.config import db, redis_client
 from app.routes.websockets import notify_log_clients
 
 router = APIRouter()
 
+class LogEntry(BaseModel):
+    level: str
+    message: str
+
+# Modèle pour recevoir plusieurs logs
+class LogBatch(BaseModel):
+    logs: List[LogEntry]
+
 @router.post("/")
-def create_log(level: str, message: str):
-    log_entry = {"level": level, "message": message, "timestamp": datetime.utcnow()}
+async def create_log(log: LogEntry):
+    log_entry = {
+        "level": log.level,
+        "message": log.message,
+        "timestamp": datetime.utcnow().isoformat()  # Conversion datetime en string
+    }
     db.logs.insert_one(log_entry)
     
-    # Stocker les logs critiques dans Redis
-    if level in ["error", "critical"]:
+    # Stocker le log dans Redis sous la clé "recent_logs" (pour les logs récents)
+    redis_client.lpush("recent_logs", json.dumps(log_entry))
+    redis_client.ltrim("recent_logs", 0, 99)  # Garde les 100 derniers logs
+
+    # Stocker les logs critiques dans Redis (pour la clé "critical_logs")
+    if log.level in ["error", "critical"]:
         redis_client.lpush("critical_logs", json.dumps(log_entry))
         redis_client.ltrim("critical_logs", 0, 9)  # Garde les 10 derniers logs critiques
     
     # Notifier les clients via WebSocket
-    notify_log_clients(log_entry)
-    
+    await notify_log_clients(log_entry)  # Ajout de await
+
     return {"message": "Log enregistré"}
+
+@router.post("/many_logs")
+async def create_logs(log_batch: LogBatch):
+    log_entries = []
+    
+    for log in log_batch.logs:
+        log_entry = {
+            "level": log.level,
+            "message": log.message,
+            "timestamp": datetime.utcnow().isoformat()  # Conversion datetime en string
+        }
+        log_entries.append(log_entry)
+        
+        # Stocker le log dans Redis sous la clé "recent_logs" (pour les logs récents)
+        redis_client.lpush("recent_logs", json.dumps(log_entry))
+        redis_client.ltrim("recent_logs", 0, 99)  # Garde les 100 derniers logs
+        
+        # Stocker les logs critiques dans Redis (pour la clé "critical_logs")
+        if log.level in ["error", "critical"]:
+            redis_client.lpush("critical_logs", json.dumps(log_entry))
+            redis_client.ltrim("critical_logs", 0, 9)  # Garde les 10 derniers logs critiques
+        
+        # Notifier les clients WebSocket
+        await notify_log_clients(log_entry)  # Ajout de await
+
+    # Insérer tous les logs en une seule fois dans MongoDB (optimisation)
+    if log_entries:
+        db.logs.insert_many(log_entries)
+
+    return {"message": f"{len(log_entries)} logs enregistrés"}
 
 @router.get("/recent")
 def get_recent_logs():
