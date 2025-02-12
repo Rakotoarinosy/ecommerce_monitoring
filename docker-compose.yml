@@ -1,4 +1,4 @@
-version: '1.0'
+version: '3.8'
 
 services:
   backend:
@@ -16,9 +16,10 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "4200:80"
+      - "4200:4200"  # Angular tourne sur 4200
     volumes:
-      - ./frontend/src:/app/src
+      - ./frontend/src:/app/src  # Monte le code source dans le conteneur
+      - /app/node_modules  # Ignore node_modules pour éviter les conflits
     depends_on:
       - backend
 

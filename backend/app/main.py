@@ -4,6 +4,7 @@ from app.routes.logs import router as log_router
 from app.routes.metrics import router as metrics_router
 from app.migrations import setup_database
 from app.routes.websockets import websocket_logs_endpoint, websocket_payments_endpoint
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="E-commerce & Monitoring API")
 
@@ -17,6 +18,20 @@ app.add_websocket_route("/ws/payments", websocket_payments_endpoint)
 app.add_websocket_route("/ws/logs", websocket_logs_endpoint)
 
 setup_database()
+# Définition des origines autorisées
+origins = [
+    "http://localhost:4200",  # Si tu testes avec `ng serve`
+    "http://127.0.0.1:4200",
+    "http://frontend:80",  # Si ton frontend tourne dans Docker
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Autoriser toutes les méthodes (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],  # Autoriser tous les headers
+)
 
 @app.get("/")
 def home():

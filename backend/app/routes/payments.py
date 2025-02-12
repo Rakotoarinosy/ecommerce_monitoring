@@ -120,6 +120,7 @@ async def payment_success(session_id: str):
                 {"$set": {"status": "success"}}
             )
             logger.info(f"Après mise à jour - modified_count: {result.modified_count}")
+            logger.info(f"Document mis à jour : {db.payments.find_one({'user_id': str(user_id)})}")
 
             if result.modified_count > 0:
                 logger.info(f"✅ Paiement mis à jour en succès pour user_id={user_id}")
