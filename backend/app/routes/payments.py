@@ -13,6 +13,8 @@ router = APIRouter()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+success_url_redirection = os.getenv("SUCCESS_URL_REDIRECTION")
+cancel_url_redirection = os.getenv("CANCEL_URL_REDIRECTION")
 
 
 # ✅ Route pour récupérer tous les paiements
@@ -45,6 +47,7 @@ def serialize_payment(payment):
 
     return {
         "id": str(payment_id),  # Assurez-vous que l'id est une chaîne valide
+        "user_id": payment.get("user_id"),
         "amount": payment.get("amount"),
         "status": payment.get("status"),
         "created_at": created_at_iso,  # Vous pouvez définir une valeur par défaut ici si nécessaire
@@ -78,7 +81,7 @@ async def create_checkout_session(user_id: str, amount: float):
             metadata={"user_id": user_id},
             mode="payment",
             success_url=f"{BASE_URL}/payments/success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{BASE_URL}/cancel",
+            cancel_url=f"{cancel_url_redirection}",
         )
 
         # Sauvegarde en base avec `pending`
@@ -103,7 +106,6 @@ async def create_checkout_session(user_id: str, amount: float):
 # ✅ Route pour gérer la redirection après un paiement réussi
 @router.get("/success")
 async def payment_success(session_id: str):
-    checkout_url = "http://localhost:4200/list-payments"
     try:
         session = stripe.checkout.Session.retrieve(session_id)
 
@@ -117,17 +119,20 @@ async def payment_success(session_id: str):
                 raise HTTPException(status_code=400, detail="user_id manquant dans les métadonnées")
 
             logger.info(f"Recherche du document avec user_id={user_id} et status=pending")
-            document = db.payments.find_one({"user_id": str(user_id), "status": "pending"})
+            document = db.payments.find_one(
+                {"user_id": str(user_id), "status": "pending"},
+                sort=[("created_at", -1)]  # Trier par la date la plus récente
+            )
             logger.info(f"Document trouvé : {document}")
 
             if document:
                 logger.info(f"Avant mise à jour - user_id: {user_id}, status: pending")
                 result = db.payments.update_one(
-                    {"user_id": str(user_id), "status": "pending"},
+                    {"_id": document["_id"]},  # Mettre à jour le paiement spécifique trouvé
                     {"$set": {"status": "success"}}
                 )
                 logger.info(f"Après mise à jour - modified_count: {result.modified_count}")
-                updated_document = db.payments.find_one({"user_id": str(user_id)})
+                updated_document = db.payments.find_one({"_id": document["_id"]})
                 logger.info(f"Document mis à jour : {updated_document}")
 
                 if result.modified_count > 0:
@@ -144,7 +149,7 @@ async def payment_success(session_id: str):
             else:
                 logger.warning(f"⚠️ Aucun document trouvé pour user_id={user_id} avec status=pending")
 
-            return RedirectResponse(url=checkout_url)
+            return RedirectResponse(url=success_url_redirection)
 
         return {"message": "Paiement non complété", "session_id": session_id}
     except Exception as e:
