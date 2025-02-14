@@ -2,6 +2,7 @@ from datetime import datetime
 import json
 import os
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import RedirectResponse
 import stripe
 from app.models import Payment
 from app.config import db, redis_client, logger
@@ -102,6 +103,7 @@ async def create_checkout_session(user_id: str, amount: float):
 # ✅ Route pour gérer la redirection après un paiement réussi
 @router.get("/success")
 async def payment_success(session_id: str):
+    checkout_url = "http://localhost:4200/list-payments"
     try:
         session = stripe.checkout.Session.retrieve(session_id)
 
@@ -114,20 +116,35 @@ async def payment_success(session_id: str):
             if not user_id:
                 raise HTTPException(status_code=400, detail="user_id manquant dans les métadonnées")
 
-            logger.info(f"Avant mise à jour - user_id: {user_id}, status: pending")
-            result = db.payments.update_one(
-                {"user_id": str(user_id), "status": "pending"},
-                {"$set": {"status": "success"}}
-            )
-            logger.info(f"Après mise à jour - modified_count: {result.modified_count}")
-            logger.info(f"Document mis à jour : {db.payments.find_one({'user_id': str(user_id)})}")
+            logger.info(f"Recherche du document avec user_id={user_id} et status=pending")
+            document = db.payments.find_one({"user_id": str(user_id), "status": "pending"})
+            logger.info(f"Document trouvé : {document}")
 
-            if result.modified_count > 0:
-                logger.info(f"✅ Paiement mis à jour en succès pour user_id={user_id}")
+            if document:
+                logger.info(f"Avant mise à jour - user_id: {user_id}, status: pending")
+                result = db.payments.update_one(
+                    {"user_id": str(user_id), "status": "pending"},
+                    {"$set": {"status": "success"}}
+                )
+                logger.info(f"Après mise à jour - modified_count: {result.modified_count}")
+                updated_document = db.payments.find_one({"user_id": str(user_id)})
+                logger.info(f"Document mis à jour : {updated_document}")
+
+                if result.modified_count > 0:
+                    logger.info(f"✅ Paiement mis à jour en succès pour user_id={user_id}")
+                    
+                    # 🔹 Notifier les clients WebSocket que le paiement est "success"
+                    await notify_payment_clients({
+                        "user_id": user_id,
+                        "amount": document["amount"],
+                        "status": "success",
+                    })
+                else:
+                    logger.warning(f"⚠️ Aucun paiement en pending trouvé pour user_id={user_id}")
             else:
-                logger.warning(f"⚠️ Aucun paiement en pending trouvé pour user_id={user_id}")
+                logger.warning(f"⚠️ Aucun document trouvé pour user_id={user_id} avec status=pending")
 
-            return {"message": "Paiement réussi", "session_id": session_id}
+            return RedirectResponse(url=checkout_url)
 
         return {"message": "Paiement non complété", "session_id": session_id}
     except Exception as e:

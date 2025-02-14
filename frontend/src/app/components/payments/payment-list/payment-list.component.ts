@@ -22,11 +22,11 @@ export class PaymentListComponent implements OnInit {
   ngOnInit(): void {
     this.fetchPayments();
 
-    // 🎯 Mettre à jour en temps réel
-    this.websocketService.getMessages().subscribe((message) => {
-      console.log("💡 Nouveau paiement reçu :", message);
-      if (message) {
-        this.payments.unshift(message);
+    // 🎯 Écouter les mises à jour via WebSocket une seule fois
+    this.websocketService.getMessages().subscribe((newPayment: any) => {
+      if (newPayment) {
+        console.log("💡 Nouveau paiement reçu :", newPayment);
+        this.payments.unshift(newPayment); // Ajouter le nouveau paiement en haut de la liste
       }
     });
   }
@@ -35,5 +35,22 @@ export class PaymentListComponent implements OnInit {
     this.paymentService.getPayments().subscribe((data) => {
       this.payments = data;
     });
+  }
+
+  // 🔹 Déclencher le paiement
+  initiatePayment(): void {
+    const userId = "123testa"; // Remplacez par l'ID utilisateur réel
+    const amount = 55; // Remplacez par le montant réel
+
+    this.paymentService.createCheckoutSession(userId, amount).subscribe(
+      (response) => {
+        console.log('Réponse du serveur:', response); // Affiche la valeur retournée
+        window.location.href = response.checkout_url
+      },
+      (error) => {
+        console.error('Erreur lors de la requête:', error);
+      }
+    );
+    
   }
 }

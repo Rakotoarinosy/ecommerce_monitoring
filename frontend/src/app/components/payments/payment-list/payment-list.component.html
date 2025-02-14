@@ -1,6 +1,8 @@
 <div class="container mt-4">
   <h2>📌 Paiements Récents</h2>
 
+  <button class="btn btn-primary mb-3" (click)="initiatePayment()">Payer maintenant</button>
+
   <div *ngIf="payments.length === 0" class="alert alert-info">
     Aucun paiement enregistré.
   </div>

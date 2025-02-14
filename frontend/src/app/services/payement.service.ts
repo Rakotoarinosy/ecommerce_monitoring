@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
@@ -18,6 +18,10 @@ export class PaymentService {
 
   // 🔹 Créer une session Stripe Checkout
   createCheckoutSession(userId: string, amount: number): Observable<any> {
-    return this.http.post(`${this.API_URL}/checkout`, { user_id: userId, amount });
+    const params = new HttpParams()
+      .set('user_id', userId)
+      .set('amount', amount.toString());
+  
+    return this.http.post(`${this.API_URL}/checkout`, null, { params });
   }
 }

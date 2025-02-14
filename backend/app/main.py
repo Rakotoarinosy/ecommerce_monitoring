@@ -21,13 +21,11 @@ setup_database()
 # Définition des origines autorisées
 origins = [
     "http://localhost:4200",  # Si tu testes avec `ng serve`
-    "http://127.0.0.1:4200",
-    "http://frontend:80",  # Si ton frontend tourne dans Docker
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],  # Autoriser toutes les méthodes (GET, POST, PUT, DELETE, etc.)
     allow_headers=["*"],  # Autoriser tous les headers
