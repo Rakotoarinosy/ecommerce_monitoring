@@ -37,6 +37,24 @@ services:
     volumes:
       - redis_data:/data
 
+  celery_worker:
+    build: ./backend
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - backend
+      - redis
+    command: celery -A app.celery_worker worker --loglevel=info
+
+  celery_beat:
+    build: ./backend
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - backend
+      - redis
+    command: celery -A app.celery_worker beat --loglevel=info
+
 volumes:
   mongodb_data:
   redis_data:

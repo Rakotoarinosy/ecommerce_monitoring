@@ -4,6 +4,7 @@ import redis
 import os
 from dotenv import load_dotenv
 import logging
+from celery import Celery
 
 load_dotenv()  # Charger les variables d'environnement
 
@@ -17,6 +18,9 @@ db = mongo_client[MONGO_DB_NAME]  # Base de données principale
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT,  db=0, decode_responses=True)
+
+# Configuration de Celery
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
 
 # Configuration du logging
 logging.basicConfig(
