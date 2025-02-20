@@ -25,7 +25,7 @@ def save_logs():
     try:
         logger.info("🚀 Début de la tâche save_logs")
         
-        log_to_redis("Début du processus d'enregistrement des logs", level="info")
+        # log_to_redis("Début du processus d'enregistrement des logs", level="info")
         
         logs = redis_client.lrange("recent_logs", 0, -1)
         if not logs:

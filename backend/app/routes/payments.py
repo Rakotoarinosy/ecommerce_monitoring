@@ -7,6 +7,7 @@ import stripe
 from app.models import Payment
 from app.config import db, redis_client, logger
 from app.routes.websockets import notify_payment_clients
+from app.tasks import log_to_redis  # Importer la fonction log_to_redis
 
 router = APIRouter()
 # 🔹 Configuration Stripe
@@ -22,6 +23,7 @@ cancel_url_redirection = os.getenv("CANCEL_URL_REDIRECTION")
 def get_payments():
     payments = list(db.payments.find({}, {"_id": 0}))  # Exclure `_id`
     return {"payments": payments}
+
 
 def serialize_payment(payment):
     # Assurez-vous que 'created_at' est un objet datetime, sinon il pourrait s'agir d'une chaîne ou null
@@ -58,6 +60,7 @@ async def get_recent_payments():
     payments = db.payments.find().sort("created_at", -1).limit(10)
     serialized_payments = [serialize_payment(p) for p in payments]
     redis_client.setex("recent_payments", 600, json.dumps(serialized_payments))
+    log_to_redis("Récupération des paiements récents réussie", level="info")  # Ajouter log à Redis
     return serialized_payments
 
 # ✅ Route pour créer une session Stripe Checkout
@@ -89,6 +92,7 @@ async def create_checkout_session(user_id: str, amount: float):
         payment.save()
 
         logger.info(f"✅ Session Stripe créée pour user_id={user_id}, montant={amount}")
+        log_to_redis(f"✅ Session Stripe créée pour user_id={user_id}, montant={amount}", level="info")  # Ajouter log à Redis
 
         # Notifier les clients via WebSocket
         await notify_payment_clients({
@@ -100,6 +104,7 @@ async def create_checkout_session(user_id: str, amount: float):
         return {"checkout_url": checkout_session.url}
     except Exception as e:
         logger.error(f"❌ Erreur lors de la création de la session Stripe : {e}")
+        log_to_redis(f"❌ Erreur lors de la création de la session Stripe : {e}", level="error")  # Ajouter log à Redis
         raise HTTPException(status_code=500, detail=f"Erreur Stripe: {str(e)}")
 
 
@@ -119,11 +124,13 @@ async def payment_success(session_id: str):
                 raise HTTPException(status_code=400, detail="user_id manquant dans les métadonnées")
 
             logger.info(f"Recherche du document avec user_id={user_id} et status=pending")
+            log_to_redis(f"Recherche du document avec user_id={user_id} et status=pending", level="info")  # Ajouter log à Redis
             document = db.payments.find_one(
                 {"user_id": str(user_id), "status": "pending"},
                 sort=[("created_at", -1)]  # Trier par la date la plus récente
             )
             logger.info(f"Document trouvé : {document}")
+            log_to_redis(f"Document trouvé : {document}", level="info")  # Ajouter log à Redis
 
             if document:
                 logger.info(f"Avant mise à jour - user_id: {user_id}, status: pending")
@@ -132,11 +139,14 @@ async def payment_success(session_id: str):
                     {"$set": {"status": "success"}}
                 )
                 logger.info(f"Après mise à jour - modified_count: {result.modified_count}")
+                log_to_redis(f"Après mise à jour - modified_count: {result.modified_count}", level="info")  # Ajouter log à Redis
                 updated_document = db.payments.find_one({"_id": document["_id"]})
                 logger.info(f"Document mis à jour : {updated_document}")
+                log_to_redis(f"Document mis à jour : {updated_document}", level="info")  # Ajouter log à Redis
 
                 if result.modified_count > 0:
                     logger.info(f"✅ Paiement mis à jour en succès pour user_id={user_id}")
+                    log_to_redis(f"✅ Paiement mis à jour en succès pour user_id={user_id}", level="info")  # Ajouter log à Redis
                     
                     # 🔹 Notifier les clients WebSocket que le paiement est "success"
                     await notify_payment_clients({
@@ -146,15 +156,19 @@ async def payment_success(session_id: str):
                     })
                 else:
                     logger.warning(f"⚠️ Aucun paiement en pending trouvé pour user_id={user_id}")
+                    log_to_redis(f"⚠️ Aucun paiement en pending trouvé pour user_id={user_id}", level="warning")  # Ajouter log à Redis
             else:
                 logger.warning(f"⚠️ Aucun document trouvé pour user_id={user_id} avec status=pending")
+                log_to_redis(f"⚠️ Aucun document trouvé pour user_id={user_id} avec status=pending", level="warning")  # Ajouter log à Redis
 
             return RedirectResponse(url=success_url_redirection)
 
         return {"message": "Paiement non complété", "session_id": session_id}
     except Exception as e:
         logger.error(f"❌ Erreur lors de la récupération de la session Stripe : {e}")
+        log_to_redis(f"❌ Erreur lors de la récupération de la session Stripe : {e}", level="error")  # Ajouter log à Redis
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
 
 # ✅ Route pour gérer les webhooks Stripe
 @router.post("/webhook")
@@ -165,11 +179,14 @@ async def stripe_webhook(request: Request):
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, WEBHOOK_SECRET)
         logger.info(f"Webhook reçu de Stripe, type d'événement: {event['type']}")
+        log_to_redis(f"Webhook reçu de Stripe, type d'événement: {event['type']}", level="info")  # Ajouter log à Redis
     except ValueError:
         logger.error("Payload Stripe invalide")
+        log_to_redis("Payload Stripe invalide", level="error")  # Ajouter log à Redis
         raise HTTPException(status_code=400, detail="⚠️ Invalid payload")
     except stripe.error.SignatureVerificationError:
         logger.error("Signature Stripe invalide")
+        log_to_redis("Signature Stripe invalide", level="error")  # Ajouter log à Redis
         raise HTTPException(status_code=400, detail="⚠️ Invalid signature")
 
     if event["type"] == "checkout.session.completed":
@@ -182,6 +199,7 @@ async def stripe_webhook(request: Request):
                 {"$set": {"status": "success"}}
             )
             logger.info(f"✅ Paiement réussi pour user_id={user_id}")
+            log_to_redis(f"✅ Paiement réussi pour user_id={user_id}", level="info")  # Ajouter log à Redis
 
             # Notifier les clients via WebSocket
             await notify_payment_clients({
@@ -191,12 +209,6 @@ async def stripe_webhook(request: Request):
             })
         else:
             logger.warning("⚠️ Aucun user_id trouvé dans la session.")
-    return {"status": "success"}
+            log_to_redis("⚠️ Aucun user_id trouvé dans la session.", level="warning")  # Ajouter log à Redis
 
-# ✅ Route pour récupérer un paiement spécifique
-@router.get("/{payment_id}")
-async def get_payment_by_id(payment_id: str):
-    payment = db.payments.find_one({"_id": payment_id}, {"_id": 0})
-    if not payment:
-        raise HTTPException(status_code=404, detail="Paiement non trouvé")
-    return payment
+    return {"status": "success"}

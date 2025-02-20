@@ -6,52 +6,68 @@ from typing import List
 active_payment_connections: List[WebSocket] = []
 active_log_connections: List[WebSocket] = []
 
+# 🔹 Verrous pour protéger les accès concurrents
+payment_lock = asyncio.Lock()
+log_lock = asyncio.Lock()
+
+from app.tasks import log_to_redis  # Importer la fonction log_to_redis
+
 # ✅ WebSocket pour les paiements
 async def websocket_payments_endpoint(websocket: WebSocket):
     await websocket.accept()
-    active_payment_connections.append(websocket)
+    async with payment_lock:  # 🔒 Protection de l'accès
+        active_payment_connections.append(websocket)
+    
     try:
         while True:
             await websocket.receive_text()  # Garde la connexion active
     except WebSocketDisconnect:
-        active_payment_connections.remove(websocket)
+        async with payment_lock:  # 🔒 Protection de l'accès
+            active_payment_connections.remove(websocket)
 
 # ✅ WebSocket pour les logs
 async def websocket_logs_endpoint(websocket: WebSocket):
     await websocket.accept()
-    active_log_connections.append(websocket)
+    async with log_lock:  # 🔒 Protection de l'accès
+        active_log_connections.append(websocket)
+    
     try:
         while True:
             await websocket.receive_text()  # Garde la connexion active
     except WebSocketDisconnect:
-        active_log_connections.remove(websocket)
+        async with log_lock:  # 🔒 Protection de l'accès
+            active_log_connections.remove(websocket)
 
 # ✅ Notifier les clients WebSocket pour les paiements
 async def notify_payment_clients(payment_data: dict):
-    disconnected_clients = []  # Connexions à supprimer
+    disconnected_clients = []
 
-    for connection in active_payment_connections:
-        try:
-            await connection.send_json(payment_data)  # 🔹 Envoi asynchrone
-        except Exception as e:
-            print(f"⚠️ Erreur WebSocket: {e}")
-            disconnected_clients.append(connection)
+    async with payment_lock:  # 🔒 Protection de l'accès
+        for connection in active_payment_connections:
+            try:
+                await connection.send_json(payment_data)
+            except Exception as e:
+                print(f"⚠️ Erreur WebSocket: {e}")
+                log_to_redis(f"⚠️ Erreur WebSocket: {e}", level="error")            
+                disconnected_clients.append(connection)
 
-    # Supprimer les connexions inactives
-    for conn in disconnected_clients:
-        active_payment_connections.remove(conn)
+        # Supprimer les connexions inactives
+        for conn in disconnected_clients:
+            active_payment_connections.remove(conn)
 
 # ✅ Notifier les clients WebSocket pour les logs
 async def notify_log_clients(log_data: dict):
-    disconnected_clients = []  # Connexions à supprimer
+    disconnected_clients = []
 
-    for connection in active_log_connections:
-        try:
-            await connection.send_json(log_data)  # 🔹 Envoi asynchrone
-        except Exception as e:
-            print(f"⚠️ Erreur WebSocket: {e}")
-            disconnected_clients.append(connection)
+    async with log_lock:  # 🔒 Protection de l'accès
+        for connection in active_log_connections:
+            try:
+                await connection.send_json(log_data)
+            except Exception as e:
+                print(f"⚠️ Erreur WebSocket: {e}")
+                log_to_redis(f"⚠️ Erreur WebSocket: {e}", level="error")      
+                disconnected_clients.append(connection)
 
-    # Supprimer les connexions inactives
-    for conn in disconnected_clients:
-        active_log_connections.remove(conn)
+        # Supprimer les connexions inactives
+        for conn in disconnected_clients:
+            active_log_connections.remove(conn)
