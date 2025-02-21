@@ -1,1 +1,20 @@
-<p>logs works!</p>
+<div class="container">
+    <h2>📌 Logs en Temps Réel</h2>
+    <table class="table table-bordered table-hover">
+      <thead>
+        <tr>
+          <th>Niveau</th>
+          <th>Message</th>
+          <th>Horodatage</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let log of logs">
+          <td>{{ log.level }}</td>
+          <td>{{ log.message }}</td>
+          <td>{{ log.timestamp }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  

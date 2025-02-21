@@ -1,18 +1,20 @@
 import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Observable } from 'rxjs';
-import { WebSocketSubject } from 'rxjs/webSocket';
+import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 
 @Injectable({
   providedIn: 'root',
 })
 export class WebsocketService {
   private socket$: WebSocketSubject<any> | null = null;
+  private logSocket$: WebSocketSubject<any> | null = null;
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {
     if (isPlatformBrowser(this.platformId)) {
       // ✅ WebSocket activé uniquement côté client
       this.socket$ = new WebSocketSubject('ws://localhost:8000/ws/payments');
+      this.logSocket$ = webSocket('ws://localhost:8000/ws/logs');
     }
   }
 
@@ -24,4 +26,9 @@ export class WebsocketService {
     }
     return this.socket$.asObservable();
   }
+
+    // ✅ Écouter les logs en temps réel
+    getLogs(): Observable<any> {
+      return this.logSocket$ ? this.logSocket$.asObservable() : new Observable();
+    }
 }

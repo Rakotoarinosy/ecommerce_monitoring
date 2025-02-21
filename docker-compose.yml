@@ -55,6 +55,23 @@ services:
       - redis
     command: celery -A app.celery_worker beat --loglevel=info
 
+  # loki:
+  #   image: grafana/loki:2.6.1
+  #   ports:
+  #     - "3100:3100"
+  #   command: -config.file=/etc/loki/local-config.yaml
+
+  # grafana:
+  #   image: grafana/grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #   depends_on:
+  #     - loki
+  #   volumes:
+  #     - grafana_data:/var/lib/grafana
+
 volumes:
   mongodb_data:
   redis_data:

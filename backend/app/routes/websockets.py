@@ -1,10 +1,16 @@
 import asyncio
 from fastapi import WebSocket, WebSocketDisconnect
 from typing import List
+from fastapi import APIRouter, WebSocket
+from app.config import redis_client
+import json
+
+router = APIRouter()
 
 # 🔹 Listes des connexions WebSocket actives
 active_payment_connections: List[WebSocket] = []
 active_log_connections: List[WebSocket] = []
+active_connections = []
 
 # 🔹 Verrous pour protéger les accès concurrents
 payment_lock = asyncio.Lock()
@@ -27,15 +33,19 @@ async def websocket_payments_endpoint(websocket: WebSocket):
 
 # ✅ WebSocket pour les logs
 async def websocket_logs_endpoint(websocket: WebSocket):
+    """ Gère les connexions WebSocket pour les logs en temps réel. """
     await websocket.accept()
-    async with log_lock:  # 🔒 Protection de l'accès
+    async with log_lock:
         active_log_connections.append(websocket)
-    
+
     try:
         while True:
-            await websocket.receive_text()  # Garde la connexion active
+            logs = redis_client.lrange("recent_logs", 0, 9)  # Récupérer les 10 derniers logs
+            logs = [json.loads(log) for log in logs]
+            await websocket.send_json({"logs": logs})
+            await asyncio.sleep(1)  # 🔄 Rafraîchissement automatique
     except WebSocketDisconnect:
-        async with log_lock:  # 🔒 Protection de l'accès
+        async with log_lock:
             active_log_connections.remove(websocket)
 
 # ✅ Notifier les clients WebSocket pour les paiements
