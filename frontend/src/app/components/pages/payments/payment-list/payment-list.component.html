@@ -24,6 +24,7 @@
                       <th>Montant</th>
                       <th>Status</th>
                       <th>Date</th>
+                      <th>Etat</th>
                     </tr>
                   </thead>
                   <tfoot class="table-dark">
@@ -33,6 +34,7 @@
                       <th>Montant</th>
                       <th>Status</th>
                       <th>Date</th>
+                      <th>Etat</th>
                     </tr>
                   </tfoot>
                   <tbody>
@@ -50,6 +52,7 @@
                         </span>
                       </td>
                       <td>{{ payment.created_at | date: 'short' }}</td>
+                      <td>{{ payment.prediction }}</td>
                     </tr>
                   </tbody>
               </table>

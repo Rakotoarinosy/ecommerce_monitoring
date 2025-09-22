@@ -23,7 +23,17 @@ export const routes: Routes = [
             path: 'logs',
             loadComponent: () => import('./components/pages/logs/logs.component').then(m => m.LogsComponent),
         },
-        { path: '', redirectTo: 'list-payments', pathMatch: 'full' },
+        {
+          path: 'api',
+          loadComponent: () => import('./components/pages/process-payment/process-payment.component').then(m => m.ProcessPaymentComponent),
+          children: [
+            {
+              path: 'process-payment',
+              loadComponent: () => import('./components/pages/process-payment/process-payment.component').then(m => m.ProcessPaymentComponent),
+            },
+          ],
+        },
+        { path: '', redirectTo: 'process-payment', pathMatch: 'full' },
       ],
     },
     // Redirection par défaut

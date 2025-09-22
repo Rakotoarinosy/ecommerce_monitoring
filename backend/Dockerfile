@@ -9,7 +9,7 @@ COPY requirements.txt ./
 COPY app/ ./app/
 
 # Installer les dépendances
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --default-timeout=100 --no-cache-dir -r requirements.txt
 
 # Exposer le port de l'API
 EXPOSE 8000

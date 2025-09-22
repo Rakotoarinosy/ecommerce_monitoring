@@ -1,19 +1,19 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClientModule } from '@angular/common/http';
-import { PaymentService } from '../../../../services/payement.service';
-import { WebsocketService } from '../../../../services/websocket.service';
+import { PaymentService } from '../../../services/payement.service';
+import { WebsocketService } from '../../../services/websocket.service';
 
 declare var $: any;
 
 @Component({
-  selector: 'app-payment-list',
+  selector: 'app-process-payment',
   standalone: true,
   imports: [CommonModule, HttpClientModule],
-  templateUrl: './payment-list.component.html',
-  styleUrl: './payment-list.component.scss'
+  templateUrl: './process-payment.component.html',
+  styleUrl: './process-payment.component.scss'
 })
-export class PaymentListComponent implements OnInit {
+export class ProcessPaymentComponent implements OnInit {
   payments: any[] = [];
   loading = false;
 
@@ -55,7 +55,7 @@ export class PaymentListComponent implements OnInit {
   initiatePayment(): void {
     this.loading = true;
     const userId = "123"; // Remplacez par l'ID utilisateur réel
-    const amount = 60; // Remplacez par le montant réel
+    const amount = 55; // Remplacez par le montant réel
 
     this.paymentService.createCheckoutSession(userId, amount).subscribe(
       (response) => {
@@ -71,4 +71,5 @@ export class PaymentListComponent implements OnInit {
     );
     
   }
+
 }

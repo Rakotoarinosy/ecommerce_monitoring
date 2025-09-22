@@ -8,6 +8,8 @@ from app.models import Payment
 from app.config import db, redis_client, logger
 from app.routes.websockets import notify_payment_clients
 from app.tasks import log_to_redis  # Importer la fonction log_to_redis
+from app.routes.ml_model import predict_payment
+
 
 router = APIRouter()
 # 🔹 Configuration Stripe
@@ -25,39 +27,70 @@ def get_payments():
     return {"payments": payments}
 
 
-def serialize_payment(payment):
-    # Assurez-vous que 'created_at' est un objet datetime, sinon il pourrait s'agir d'une chaîne ou null
-    created_at = payment.get("created_at")
+# def serialize_payment(payment):
+#     # Assurez-vous que 'created_at' est un objet datetime, sinon il pourrait s'agir d'une chaîne ou null
+#     created_at = payment.get("created_at")
     
+#     if isinstance(created_at, datetime):
+#         created_at_iso = created_at.isoformat()
+#     elif isinstance(created_at, str):
+#         try:
+#             created_at_obj = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")  # Adaptez le format si nécessaire
+#             created_at_iso = created_at_obj.isoformat()
+#         except ValueError:
+#             created_at_iso = None  # Si la chaîne n'est pas dans le bon format, mettez la valeur à None
+#     elif created_at is None:
+#         created_at_iso = None  # Si 'created_at' est null, vous pouvez le définir sur None ou une valeur par défaut
+#     else:
+#         created_at_iso = None  # Pour tout autre type inattendu, définissez à None
+
+#     # Vérifiez si l'ID existe et est valide
+#     payment_id = payment.get("id")
+#     if payment_id is None:
+#         payment_id = str(payment.get("_id"))  # Essayez de récupérer l'_id si l'id n'est pas présent
+
+#     return {
+#         "id": str(payment_id),  # Assurez-vous que l'id est une chaîne valide
+#         "user_id": payment.get("user_id"),
+#         "amount": payment.get("amount"),
+#         "status": payment.get("status"),
+#         "created_at": created_at_iso,  # Vous pouvez définir une valeur par défaut ici si nécessaire
+#     }
+
+def serialize_payment(payment):
+    created_at = payment.get("created_at")
+
     if isinstance(created_at, datetime):
         created_at_iso = created_at.isoformat()
     elif isinstance(created_at, str):
         try:
-            created_at_obj = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")  # Adaptez le format si nécessaire
+            created_at_obj = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
             created_at_iso = created_at_obj.isoformat()
         except ValueError:
-            created_at_iso = None  # Si la chaîne n'est pas dans le bon format, mettez la valeur à None
-    elif created_at is None:
-        created_at_iso = None  # Si 'created_at' est null, vous pouvez le définir sur None ou une valeur par défaut
+            created_at_iso = None
     else:
-        created_at_iso = None  # Pour tout autre type inattendu, définissez à None
+        created_at_iso = None
 
-    # Vérifiez si l'ID existe et est valide
-    payment_id = payment.get("id")
-    if payment_id is None:
-        payment_id = str(payment.get("_id"))  # Essayez de récupérer l'_id si l'id n'est pas présent
+    payment_id = payment.get("id") or str(payment.get("_id"))
 
-    return {
-        "id": str(payment_id),  # Assurez-vous que l'id est une chaîne valide
+    payment_dict = {
+        "id": str(payment_id),
         "user_id": payment.get("user_id"),
         "amount": payment.get("amount"),
         "status": payment.get("status"),
-        "created_at": created_at_iso,  # Vous pouvez définir une valeur par défaut ici si nécessaire
+        "created_at": created_at_iso,
     }
+
+    # 🔎 Ajouter la prédiction d’anomalie
+    payment_with_prediction = predict_payment(payment_dict)
+
+    print(f"Payment with prediction: {payment_with_prediction}")  # Debugging line
+    return payment_with_prediction
+
 
 @router.get("/recent")
 async def get_recent_payments():
-    payments = db.payments.find().sort("created_at", -1).limit(10)
+    payments = db.payments.find().sort("created_at", -1)
     serialized_payments = [serialize_payment(p) for p in payments]
     redis_client.setex("recent_payments", 600, json.dumps(serialized_payments))
     log_to_redis("Récupération des paiements récents réussie", level="info")  # Ajouter log à Redis

@@ -1,0 +1,59 @@
+<!-- Begin Page Content -->
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">📌 Paiements Récents</h1>
+    <button class="btn btn-primary" (click)="initiatePayment()" [disabled]="loading">
+      <span *ngIf="loading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      💳 Payer maintenant
+    </button>
+  
+    <!-- Page Heading -->
+    <p class="mb-4">Consultez les paiements récents effectués par les utilisateurs. Vous pouvez voir le montant, le statut et la date de chaque paiement.</p>
+  
+    <!-- DataTales Example -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Paiements Récents</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="paymentsTable" width="100%" cellspacing="0">
+                    <thead class="table-dark">
+                      <tr>
+                        <th>ID</th>
+                        <th>User_id</th>
+                        <th>Montant</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tfoot class="table-dark">
+                      <tr>
+                        <th>ID</th>
+                        <th>User_id</th>
+                        <th>Montant</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                      </tr>
+                    </tfoot>
+                    <tbody>
+                      <tr *ngFor="let payment of payments" [ngClass]="{'table-success': payment.status === 'success', 'table-danger': payment.status === 'failed', 'table-warning': payment.status === 'pending'}">
+                        <td>{{ payment.id }}</td>
+                        <td>{{ payment.user_id }}</td>
+                        <td>{{ payment.amount | currency:'USD' }}</td>
+                        <td>
+                          <span [ngClass]="{
+                            'badge bg-success': payment.status === 'success',
+                            'badge bg-danger': payment.status === 'failed',
+                            'badge bg-warning': payment.status === 'pending'
+                          }">
+                            {{ payment.status }}
+                          </span>
+                        </td>
+                        <td>{{ payment.created_at | date: 'short' }}</td>
+                      </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+  </div>
