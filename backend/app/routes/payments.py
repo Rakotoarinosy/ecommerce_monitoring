@@ -85,6 +85,16 @@ def serialize_payment(payment):
     payment_with_prediction = predict_payment(payment_dict)
 
     print(f"Payment with prediction: {payment_with_prediction}")  # Debugging line
+    
+    # 📊 Incrémenter les métriques Prometheus
+    from app.services.metrics_service import record_payment, record_anomaly
+    record_payment(
+        status=payment_dict.get("status", "unknown"),
+        amount=payment_dict.get("amount", 0)
+    )
+    if payment_with_prediction.get("prediction") == "anomalie 🚨":
+        record_anomaly()
+
     return payment_with_prediction
 
 
