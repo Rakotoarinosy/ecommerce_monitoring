@@ -1,0 +1,73 @@
+groups:
+  - name: infra_alerts
+    rules:
+
+      # CPU > 85% pendant 5 minutes
+      - alert: HighCPUUsage
+        expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "🖥️ CPU VPS élevé ({{ $value | humanize }}%)"
+          description: >
+            L'utilisation CPU du VPS dépasse 85% depuis 5 minutes.
+
+      # RAM > 90%
+      - alert: HighMemoryUsage
+        expr: >
+          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+          / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "🧠 Mémoire RAM critique ({{ $value | humanize }}%)"
+          description: >
+            La RAM du VPS est utilisée à plus de 90%.
+            Risque de crash imminent.
+
+      # Disque > 85%
+      - alert: DiskSpaceLow
+        expr: >
+          (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"})
+          / node_filesystem_size_bytes{fstype!="tmpfs"} * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "💾 Espace disque faible ({{ $value | humanize }}%)"
+          description: >
+            L'espace disque disponible est en dessous de 15%.
+
+      # Backend down (plus de métriques depuis 1 minute)
+      - alert: BackendDown
+        expr: up{job="ecommerce_backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "🔴 Backend FastAPI indisponible"
+          description: >
+            Le backend FastAPI ne répond plus depuis 1 minute.
+            Vérifier le container ecommerce_backend.
+
+      # Latence HTTP p95 > 2 secondes
+      - alert: HighHTTPLatency
+        expr: >
+          histogram_quantile(0.95,
+            rate(ecommerce_http_request_duration_seconds_bucket[5m])
+          ) > 2
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "🐌 Latence HTTP élevée (p95 > 2s)"
+          description: >
+            95% des requêtes prennent plus de 2 secondes.
+            Vérifier les performances du backend.

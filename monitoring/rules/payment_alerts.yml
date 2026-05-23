@@ -1,0 +1,46 @@
+groups:
+  - name: payment_alerts
+    rules:
+
+      # Alerte si taux d'échec des paiements > 10% sur 5 minutes
+      - alert: HighPaymentFailureRate
+        expr: >
+          rate(ecommerce_payments_total{status="failed"}[5m])
+          /
+          (rate(ecommerce_payments_total{status="success"}[5m]) + rate(ecommerce_payments_total{status="failed"}[5m]))
+          > 0.10
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "🔴 Taux d'échec paiements élevé"
+          description: >
+            {{ $value | humanizePercentage }} des paiements échouent
+            sur les 5 dernières minutes. Vérifier Stripe et le backend.
+
+      # Alerte si paiement anormalement élevé (> 5000$)
+      - alert: SuspiciousPaymentAmount
+        expr: increase(ecommerce_payments_amount_total{status="success"}[1m]) > 5000
+        for: 0m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "💰 Montant de paiement suspect"
+          description: >
+            Un paiement de plus de $5000 vient d'être enregistré.
+            Vérifier s'il s'agit d'une anomalie.
+
+      # Alerte si aucun paiement depuis 30 minutes (service peut-être down)
+      - alert: NoPaymentsReceived
+        expr: increase(ecommerce_payments_total[30m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "⚠️ Aucun paiement reçu depuis 30 minutes"
+          description: >
+            Aucun paiement enregistré depuis 30 minutes.
+            Vérifier la connectivité Stripe et le backend.

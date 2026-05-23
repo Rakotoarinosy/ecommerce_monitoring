@@ -1,0 +1,105 @@
+global:
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'fehizoroarinosy@gmail.com'
+  smtp_auth_username: 'fehizoroarinosy@gmail.com'
+  smtp_auth_password: '${GMAIL_APP_PASSWORD}'   # App Password Gmail (pas ton mdp principal)
+  smtp_require_tls: true
+  # Délai avant de re-notifier si l'alerte est toujours active
+  resolve_timeout: 5m
+
+# ─── Templates d'email ───────────────────────────────────────────────
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# ─── Routing des alertes ─────────────────────────────────────────────
+route:
+  # Récepteur par défaut
+  receiver: 'email-default'
+  group_by: ['alertname', 'severity', 'team']
+  group_wait:      30s   # Attente avant d'envoyer le premier email du groupe
+  group_interval:  5m    # Intervalle entre les emails d'un même groupe
+  repeat_interval: 4h    # Ne pas re-notifier avant 4h si toujours actif
+
+  # Sous-routes par criticité
+  routes:
+    # Alertes critiques → notif immédiate
+    - match:
+        severity: critical
+      receiver: 'email-critical'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # Alertes MLOps
+    - match:
+        team: mlops
+      receiver: 'email-mlops'
+      group_wait: 15s
+      repeat_interval: 2h
+
+    # Alertes DevOps infra
+    - match:
+        team: devops
+      receiver: 'email-default'
+      repeat_interval: 6h
+
+# ─── Récepteurs ──────────────────────────────────────────────────────
+receivers:
+
+  - name: 'email-default'
+    email_configs:
+      - to: 'fehizoroarinosy@gmail.com'
+        send_resolved: true
+        headers:
+          Subject: '[E-Commerce Monitoring] ⚠️ {{ .GroupLabels.alertname }}'
+        html: |
+          <h2 style="color:#1A4A8A;">E-Commerce Monitoring — Alerte</h2>
+          {{ range .Alerts }}
+          <div style="border-left:4px solid #F59E0B; padding:10px; margin:10px 0;">
+            <b>{{ .Annotations.summary }}</b><br/>
+            <small>{{ .Annotations.description }}</small><br/>
+            <small>Sévérité : <b>{{ .Labels.severity }}</b> | Équipe : {{ .Labels.team }}</small>
+          </div>
+          {{ end }}
+
+  - name: 'email-critical'
+    email_configs:
+      - to: 'fehizoroarinosy@gmail.com'
+        send_resolved: true
+        headers:
+          Subject: '[E-Commerce Monitoring] 🔴 CRITIQUE — {{ .GroupLabels.alertname }}'
+        html: |
+          <h2 style="color:#DC2626;">🔴 ALERTE CRITIQUE — E-Commerce Monitoring</h2>
+          {{ range .Alerts }}
+          <div style="border-left:4px solid #DC2626; padding:10px; margin:10px 0; background:#FEF2F2;">
+            <b>{{ .Annotations.summary }}</b><br/>
+            <small>{{ .Annotations.description }}</small><br/>
+            <small>Début : {{ .StartsAt.Format "02/01/2006 15:04:05" }}</small>
+          </div>
+          {{ end }}
+          <p style="color:#6B7280;">Connectez-vous à Grafana : <a href="http://localhost:3000">http://localhost:3000</a></p>
+
+  - name: 'email-mlops'
+    email_configs:
+      - to: 'fehizoroarinosy@gmail.com'
+        send_resolved: true
+        headers:
+          Subject: '[MLOps] 🤖 {{ .GroupLabels.alertname }} — Anomalie détectée'
+        html: |
+          <h2 style="color:#7C3AED;">🤖 MLOps Alert — Isolation Forest</h2>
+          {{ range .Alerts }}
+          <div style="border-left:4px solid #7C3AED; padding:10px; margin:10px 0; background:#F5F3FF;">
+            <b>{{ .Annotations.summary }}</b><br/>
+            <small>{{ .Annotations.description }}</small><br/>
+            <small>Sévérité : <b>{{ .Labels.severity }}</b></small>
+          </div>
+          {{ end }}
+          <p>Vérifier le dashboard Grafana MLOps pour les détails.</p>
+
+# ─── Inhibitions (éviter le spam) ────────────────────────────────────
+inhibit_rules:
+  # Si le backend est down, ne pas envoyer aussi les alertes de latence
+  - source_match:
+      alertname: 'BackendDown'
+    target_match:
+      alertname: 'HighHTTPLatency'
+    equal: ['job']

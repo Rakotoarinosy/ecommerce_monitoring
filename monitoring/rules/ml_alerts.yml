@@ -1,0 +1,30 @@
+groups:
+  - name: mlops_anomaly_alerts
+    rules:
+
+      # Alerte si le modèle ML détecte un pic d'anomalies (> 3 en 5 minutes)
+      - alert: AnomalySpike
+        expr: increase(ecommerce_anomalies_detected_total[5m]) > 3
+        for: 1m
+        labels:
+          severity: critical
+          team: mlops
+        annotations:
+          summary: "🚨 Pic d'anomalies ML détecté"
+          description: >
+            Le modèle Isolation Forest a détecté {{ $value }} anomalies
+            de paiement en 5 minutes. Une investigation est nécessaire.
+
+      # Alerte si aucune prédiction ML depuis 10 minutes (modèle peut-être down)
+      - alert: MLModelSilent
+        expr: increase(ecommerce_anomalies_detected_total[10m]) == 0
+              and increase(ecommerce_payments_total[10m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "⚠️ Modèle ML silencieux"
+          description: >
+            Des paiements sont traités mais aucune anomalie n'est remontée
+            depuis 10 minutes. Vérifier le pipeline ML.
