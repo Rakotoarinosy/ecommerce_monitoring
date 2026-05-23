@@ -1,182 +1,265 @@
-# 🛒 E-commerce Monitoring System
+# 🚀 E-Commerce Monitoring & MLOps Platform
 
-Un système combinant **paiement en temps réel** et **monitoring avancé des logs**. Ce projet est conçu pour être **modulaire, scalable** et proche d'un environnement de production.
+Une plateforme moderne de supervision e-commerce combinant :
 
----
+* 📊 observabilité temps réel
+* 🤖 détection d’anomalies par Machine Learning
+* 📈 monitoring applicatif & infrastructure
+* ⚡ traitement asynchrone des logs
+* 🔍 centralisation et analyse des événements système
+* 🐳 architecture conteneurisée orientée DevOps & MLOps
 
-## 🚀 Technologies Utilisées
-
-- **Backend** : FastAPI (Python)
-- **Frontend** : Angular
-- **Base de données** : MongoDB
-- **Cache** : Redis
-- **Monitoring** : Grafana & Prometheus
-- **Tâches en arrière-plan** : Celery & Celery Beat
-- **Déploiement** : Docker & Docker Compose
-- **Paiement** : Stripe/PayPal (intégration optionnelle)
+Le projet a initialement été développé dans le cadre d’un mémoire de Master MIAGE, puis progressivement transformé vers une architecture moderne inspirée des environnements cloud-native et MLOps.
 
 ---
 
-## 📌 Fonctionnalités
+# 🎯 Objectifs du Projet
 
-### 🔹 Module de Paiement en Temps Réel
-✅ **Intégration Stripe/PayPal** pour traiter les paiements.  
-✅ **Stockage des paiements** et utilisateurs dans MongoDB.  
-✅ **Mise en cache des transactions** récentes avec Redis.  
-✅ **Gestion des statuts de paiement** (succès, échec, en attente).  
-✅ **WebSockets** pour mise à jour en temps réel.  
-✅ **Interface Angular** avec historique des paiements et graphiques.  
+Cette plateforme vise à :
 
-### 🔹 Module de Gestion des Logs et Monitoring
-✅ **Collecte des logs** des paiements et erreurs API.  
-✅ **Stockage des logs** dans MongoDB.  
-✅ **Cache des logs critiques** récents avec Redis.  
-✅ **WebSockets** pour affichage en temps réel des logs.  
-✅ **Tableau de bord Angular** avec filtres et graphiques.  
-✅ **Intégration avec Grafana & Prometheus** pour visualisation avancée.  
+✅ superviser les paiements e-commerce en temps réel
+✅ détecter automatiquement des comportements suspects
+✅ centraliser les logs applicatifs
+✅ observer les performances backend & infrastructure
+✅ industrialiser progressivement les workflows ML
+✅ explorer les pratiques modernes DevOps / MLOps
 
 ---
 
-## 📌 Prérequis
+# 🧠 Fonctionnalités Principales
 
-Avant d'exécuter le projet, assure-toi d'avoir installé :
+## 📌 Monitoring & Observabilité
 
-- **Docker & Docker Compose**
-- **Python 3.10+** (si exécution hors Docker)
-- **Node.js 16+ & Angular CLI** (pour le frontend si hors Docker)
+* Monitoring temps réel avec Prometheus & Grafana
+* Dashboards dynamiques de supervision
+* Métriques HTTP personnalisées
+* Monitoring CPU / RAM / endpoints
+* Visualisation des performances applicatives
+* Centralisation des logs avec Loki
+* Analyse temps réel des événements backend
+
+---
+
+## 🤖 Détection d’Anomalies ML
+
+Le système intègre un moteur de détection d’anomalies permettant d’identifier automatiquement des paiements suspects.
+
+### Exemple :
+
+Un paiement inhabituel de `$1900` a été automatiquement détecté comme anomalie et visualisé dans les dashboards Grafana.
+
+Fonctionnalités :
+
+* prédiction temps réel
+* classification normal/anomalie
+* supervision des anomalies détectées
+* visualisation dans Grafana
+* monitoring des comportements suspects
+
+---
+
+## ⚡ Traitement Asynchrone des Logs
+
+Afin d’améliorer les performances et la scalabilité du système :
+
+* Redis est utilisé comme broker de messages
+* Celery permet le traitement asynchrone
+* les logs critiques sont enregistrés en arrière-plan
+* les tâches longues sont découplées du backend principal
+
+Cela permet :
+
+* une meilleure réactivité API
+* une architecture plus scalable
+* une meilleure résilience du système
+
+---
+
+# 🏗️ Architecture Technique
+
+## 🔧 Stack Backend
+
+* FastAPI
+* Python
+* WebSockets
+* Celery
+* Redis
+* MongoDB
+
+---
+
+## 🎨 Frontend
+
+* Angular
+* Dashboard temps réel
+* Visualisation des paiements
+* Affichage des logs
+* Interface de monitoring
+
+---
+
+## 📊 Monitoring & Logging
+
+* Prometheus
+* Grafana
+* Loki
+
+---
+
+## 🐳 DevOps & Infrastructure
+
+* Docker
+* Docker Compose
+* Architecture conteneurisée
+* Préparation Kubernetes
+* Approche GitOps (future évolution)
+
+---
+
+# 📸 Aperçu du Projet
+
+## ✅ Dashboard Grafana
+
+* supervision temps réel
+* métriques système
+* anomalies ML
+* monitoring HTTP
+
+## ✅ Interface Frontend
+
+* paiements récents
+* détection d’anomalies
+* logs applicatifs
+* monitoring utilisateur
+
+---
+
+# 📂 Structure du Projet
 
 ```bash
-docker --version
-python3 --version
-node -v
-ng version
+ecommerce_monitoring/
+│
+├── backend/
+│   ├── app/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   ├── tasks/
+│   │   ├── monitoring/
+│   │   ├── websocket/
+│   │   └── ml/
+│   │
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── frontend/
+│   ├── src/app/
+│   └── Dockerfile
+│
+├── monitoring/
+│   ├── grafana/
+│   ├── prometheus/
+│   └── loki/
+│
+├── docker-compose.yml
+└── README.md
 ```
 
 ---
 
-## 📌 Installation & Configuration
+# ⚙️ Installation
 
-### **1️⃣ Cloner le projet**
+## 📌 Cloner le projet
+
 ```bash
-git clone https://github.com/ton-repo/ecommerce-monitoring.git
+git clone https://github.com/your-username/ecommerce-monitoring.git
+
 cd ecommerce-monitoring
 ```
 
-### **2️⃣ Configurer les variables d'environnement**
-Crée un fichier `.env` dans `backend/` et ajoute :
-
-```ini
-MONGO_URI=mongodb://mongodb:27017
-MONGO_DB_NAME=ecommerce_db
-REDIS_HOST=redis
-REDIS_PORT=6379
-STRIPE_SECRET_KEY=sk_test_xxx
-STRIPE_PUBLIC_KEY=pk_test_xxx
-```
-
 ---
 
-## 📌 Lancer le projet avec Docker
+## 📌 Lancer avec Docker
+
 ```bash
 docker compose up -d --build
 ```
-✅ **Services inclus :**  
-- Backend : `FastAPI + WebSockets`  
-- Frontend : `Angular`  
-- Base de données : `MongoDB`  
-- Stockage temporaire : `Redis`  
-- Tâches en arrière-plan : `Celery + Celery Beat`  
-- Gestion des paiements : `Stripe/PayPal`  
 
 ---
 
-## 📌 Vérifier les Logs & WebSockets
+# 🌐 Services Disponibles
 
-### **🎯 Accéder au Backend (FastAPI)**
-- **Swagger API Docs** : [http://localhost:8000/docs](http://localhost:8000/docs)  
+| Service          | URL                        |
+| ---------------- | -------------------------- |
+| Frontend Angular | http://localhost:4200      |
+| Backend FastAPI  | http://localhost:8000      |
+| Swagger API      | http://localhost:8000/docs |
+| Grafana          | http://localhost:3000      |
+| Prometheus       | http://localhost:9090      |
 
-### **🎯 Affichage des logs en temps réel**
-- **Vérifier la connexion WebSocket des logs**  
+---
+
+# 📡 Exemple de Métriques Prometheus
+
 ```bash
-docker logs -f ecommerce_monitoring-backend-1
+curl http://localhost:8000/metrics/metrics
 ```
 
-- **Se connecter à WebSocket depuis le navigateur**  
-```javascript
-const ws = new WebSocket("ws://localhost:8000/ws/logs");
-ws.onmessage = (event) => console.log("Logs:", event.data);
-```
+Métriques exposées :
 
-### **🎯 Vérifier les logs enregistrés dans MongoDB**
-```bash
-docker exec -it ecommerce_monitoring-mongodb-1 mongosh
-use ecommerce_db
-db.logs.find().pretty()
-```
+* ecommerce_payments_total
+* ecommerce_anomalies_detected_total
+* ecommerce_http_request_duration_seconds
+* ecommerce_logs_total
 
 ---
 
-## 📌 API Endpoints
+# 🔄 Évolutions Futures
 
-### 📌 Paiements
-- `POST /payments` : Créer un nouveau paiement.
-- `GET /payments/{id}` : Récupérer les détails d'un paiement.
-- `GET /payments/recent` : Obtenir les derniers paiements (cache Redis).
+## 🚀 Roadmap MLOps
 
-### 📌 Logs
-- `POST /logs` : Enregistrer un log.
-- `GET /logs/recent` : Récupérer les logs récents.
-- `GET /logs/stats` : Obtenir les statistiques des logs.
-
-### 📌 Interface Utilisateur
-- **Dashboard Angular** : Accédez à l'interface pour visualiser les paiements et les logs en temps réel.
+* MLflow
+* Model Registry
+* Model Monitoring
+* Data Drift Detection
+* Automated Retraining
+* CI/CD ML Pipelines
 
 ---
 
-## 📌 Contribution
+## ☸️ Roadmap Kubernetes
 
-Les contributions sont les bienvenues ! Voici comment vous pouvez aider :
-
-1. **Forker le projet**
-2. **Créer une branche** pour votre fonctionnalité (`git checkout -b feature/AmazingFeature`)
-3. **Commiter vos changements** (`git commit -m 'Ajout d'une fonctionnalité incroyable'`)
-4. **Pusher la branche** (`git push origin feature/AmazingFeature`)
-5. **Ouvrir une Pull Request**
-
----
-
-## 📌 Structure du Projet
-```bash
-ecommerce_monitoring/
-│-- backend/               # 📌 API FastAPI + WebSockets
-│   ├-- app/
-│   │   ├-- config.py      # 📌 Configuration (MongoDB, Redis, Celery, Stripe)
-│   │   ├-- routes/        # 📌 Routes API (logs, paiements)
-│   │   ├-- tasks.py       # 📌 Tâches Celery (sauvegarde des logs, paiements)
-│   │   ├-- websockets.py  # 📌 Gestion WebSocket en temps réel
-│   ├-- Dockerfile
-│   ├-- requirements.txt
-│-- frontend/              # 📌 Application Angular
-│   ├-- src/app/
-│   │   ├-- services/      # 📌 WebSocketService (logs en temps réel, paiements)
-│   │   ├-- components/    # 📌 UI pour affichage des logs et paiements
-│   ├-- Dockerfile
-│-- docker-compose.yml     # 📌 Orchestration des services
-│-- README.md              # 📌 Documentation
-```
+* Kubernetes deployment
+* Helm Charts
+* ArgoCD
+* GitOps workflow
+* Horizontal scaling
+* Observabilité cloud-native
 
 ---
 
-## 📌 Prochaine Étape 🔥
-1️⃣ **Mettre en place un système d’alertes (Slack, Email)**  
-2️⃣ **Créer un Dashboard avec des statistiques en temps réel**  
-3️⃣ **Intégrer une API Gateway (NGINX) pour améliorer la sécurité**  
+# 📚 Concepts Explorés
+
+Ce projet explore la convergence entre :
+
+* DevOps
+* Observabilité
+* Monitoring intelligent
+* Machine Learning
+* MLOps
+* Cloud-native architecture
+* Asynchronous processing
+* Distributed systems
 
 ---
 
-## 📌 Auteurs
-👨‍💻 **RAKOTOARINOSY Fehizoro Andry** – _Dev Back & Monitoring_  
-👨‍💻 **None** – _Contributeurs_  
-📅 **Mise à jour :** `2025-02-14`  
+# 👨‍💻 Auteur
 
-🔥 **Bon monitoring !** 🚀
+**RAKOTOARINOSY Fehizoro Andry**
+Master MIAGE — Informatique Appliquée à la Gestion d’Entreprise
+
+https://rakotoarinosy.com
+---
+
+# ⭐ Remarque
+
+Ce projet continue d’évoluer progressivement vers une architecture MLOps complète afin d’explorer les problématiques modernes de supervision, d’automatisation et d’industrialisation du Machine Learning.
