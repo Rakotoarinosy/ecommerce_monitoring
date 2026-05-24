@@ -28,6 +28,11 @@ celery.conf.beat_schedule = {
         "task": "app.tasks.save_logs",
         "schedule": crontab(minute="*/1"),
         "options": {"queue": "celery"}
+    },
+    "retrain_model_daily": {
+        "task": "app.tasks.retrain_model",
+        "schedule": crontab(hour="2", minute="0"),
+        "options": {"queue": "celery"}
     }
 }
 

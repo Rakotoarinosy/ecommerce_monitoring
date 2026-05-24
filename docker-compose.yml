@@ -234,17 +234,20 @@ services:
     restart: unless-stopped
 
   mongodb-exporter:
-    image: percona/mongodb_exporter:0.40
-    container_name: mongodb-exporter
-    ports:
-      - "9216:9216"
-    environment:
-      - MONGODB_URI=mongodb://mongodb:27017
-    depends_on:
-      - mongodb
-    networks:
-      - monitoring
-    restart: unless-stopped
+      image: percona/mongodb_exporter:0.40
+      container_name: mongodb-exporter
+      ports:
+        - "9216:9216"
+      environment:
+        - MONGODB_URI=mongodb://mongodb:27017
+      command:
+        - --collect-all
+        - --compatible-mode
+      depends_on:
+        - mongodb
+      networks:
+        - monitoring
+      restart: unless-stopped
 
   redis-exporter:
     image: oliver006/redis_exporter:latest
@@ -255,6 +258,27 @@ services:
       - REDIS_ADDR=redis://redis:6379
     depends_on:
       - redis
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+      - ./backend/app/ml:/ml
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:////mlflow/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
     networks:
       - monitoring
     restart: unless-stopped
@@ -270,6 +294,7 @@ volumes:
   grafana_data:
   loki_data:
   alertmanager_data:
+  mlflow_data:
 
 networks:
   monitoring:

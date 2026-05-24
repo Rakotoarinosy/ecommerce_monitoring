@@ -23,6 +23,7 @@ Jinja2==3.1.5
 kombu==5.4.2
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
+mlflow==2.22.0
 mdurl==0.1.2
 orjson==3.10.15
 prometheus_client==0.21.1

@@ -3,6 +3,9 @@ from app.celery_worker import celery
 import json
 import logging
 from datetime import datetime
+import sys
+sys.path.insert(0, "/app/app/ml")
+from app.ml.train_model import train_and_log
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,3 +57,32 @@ def test_celery():
     """Tâche de test pour vérifier si Celery fonctionne."""
     logger.info("✅ Tâche Celery test exécutée avec succès.")
     return {"status": "success"}
+
+@celery.task(name="app.tasks.retrain_model")
+def retrain_model():
+    """Réentraîne le modèle Isolation Forest avec MLflow tracking."""
+    try:
+        logger.info("🤖 Début du réentraînement MLOps")
+        log_to_redis("🤖 Réentraînement du modèle ML démarré", level="info")
+
+
+        result = train_and_log()
+        run_id  = result["run_id"]
+        metrics = result["metrics"]
+
+        logger.info(f"✅ Réentraînement terminé — Run ID: {run_id}")
+
+        from app.routes.ml_model import reload_model
+        reload_model()
+
+        log_to_redis(
+            f"✅ Modèle réentraîné — F1={metrics['f1_score']} — "
+            f"Anomalies={metrics['anomaly_count']}/{metrics['dataset_size']}",
+            level="info"
+        )
+        return {"status": "success", "run_id": run_id, "metrics": metrics}
+
+    except Exception as e:
+        logger.error(f"❌ Erreur réentraînement: {e}", exc_info=True)
+        log_to_redis(f"❌ Erreur réentraînement modèle: {e}", level="error")
+        return {"status": "error", "message": str(e)}
