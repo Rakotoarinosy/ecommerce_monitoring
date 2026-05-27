@@ -28,10 +28,12 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
     container_name: ecommerce_frontend
     ports:
-      - "4200:4200"
+      - "4200:80"
     volumes:
       - ./frontend/src:/app/src
       - /app/node_modules
@@ -228,7 +230,7 @@ services:
     image: prom/node-exporter:latest
     container_name: node-exporter
     ports:
-      - "9100:9100"
+      - "9101:9100"
     networks:
       - monitoring
     restart: unless-stopped
