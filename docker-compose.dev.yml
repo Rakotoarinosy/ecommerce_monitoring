@@ -1,0 +1,301 @@
+version: '3.8'
+
+services:
+
+  # ════════════════════════════════════════════════════════════════════
+  #  APPLICATION
+  # ════════════════════════════════════════════════════════════════════
+
+  backend:
+    build: ./backend
+    container_name: ecommerce_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/app:/app/app
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - monitoring
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: ecommerce_frontend
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./frontend/src:/app/src
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - monitoring
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  # ════════════════════════════════════════════════════════════════════
+  #  BASE DE DONNÉES & CACHE
+  # ════════════════════════════════════════════════════════════════════
+
+  mongodb:
+    image: mongo:6
+    container_name: ecommerce_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - monitoring
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: ecommerce_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - monitoring
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    restart: unless-stopped
+
+  # ════════════════════════════════════════════════════════════════════
+  #  CELERY
+  # ════════════════════════════════════════════════════════════════════
+
+  celery_worker:
+    build: ./backend
+    container_name: ecommerce_celery_worker
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - backend
+      - redis
+    command: celery -A app.celery_worker worker --loglevel=info
+    networks:
+      - monitoring
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  celery_beat:
+    build: ./backend
+    container_name: ecommerce_celery_beat
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - backend
+      - redis
+    command: celery -A app.celery_worker beat --loglevel=info
+    networks:
+      - monitoring
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    restart: unless-stopped
+
+  # ════════════════════════════════════════════════════════════════════
+  #  OBSERVABILITÉ — MÉTRIQUES
+  # ════════════════════════════════════════════════════════════════════
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - backend
+      - alertmanager
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123        # ⚠️ Changer en production !
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=smtp.gmail.com:587
+      - GF_SMTP_USER=fehizoroarinosy@gmail.com
+      - GF_SMTP_PASSWORD=${GMAIL_APP_PASSWORD}    # dans .env
+      - GF_SMTP_FROM_ADDRESS=fehizoroarinosy@gmail.com
+      - GF_SMTP_FROM_NAME=E-Commerce Monitoring
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # ════════════════════════════════════════════════════════════════════
+  #  OBSERVABILITÉ — LOGS
+  # ════════════════════════════════════════════════════════════════════
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/config.yml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/config.yml
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # ════════════════════════════════════════════════════════════════════
+  #  EXPORTERS — MÉTRIQUES INFRA
+  # ════════════════════════════════════════════════════════════════════
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  mongodb-exporter:
+      image: percona/mongodb_exporter:0.40
+      container_name: mongodb-exporter
+      ports:
+        - "9216:9216"
+      environment:
+        - MONGODB_URI=mongodb://mongodb:27017
+      command:
+        - --collect-all
+        - --compatible-mode
+      depends_on:
+        - mongodb
+      networks:
+        - monitoring
+      restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+      - ./backend/app/ml:/ml
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:////mlflow/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+# ════════════════════════════════════════════════════════════════════
+#  VOLUMES & NETWORK
+# ════════════════════════════════════════════════════════════════════
+
+volumes:
+  mongodb_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  alertmanager_data:
+  mlflow_data:
+
+networks:
+  monitoring:
+    driver: bridge
