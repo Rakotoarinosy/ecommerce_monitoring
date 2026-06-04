@@ -10,7 +10,7 @@ services:
     build: ./backend
     container_name: ecommerce_backend
     ports:
-      - "8011:8000"
+      - "8011:8011"
     env_file:
       - ./backend/.env
     volumes:
