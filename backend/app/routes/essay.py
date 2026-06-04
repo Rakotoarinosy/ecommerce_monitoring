@@ -10,7 +10,7 @@ from app.routes.websockets import notify_payment_clients
 router = APIRouter()
 # 🔹 Configuration Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8011")
 WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 
 @router.get("/success")

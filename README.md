@@ -191,8 +191,8 @@ docker compose up -d --build
 | Service          | URL                        |
 | ---------------- | -------------------------- |
 | Frontend Angular | http://localhost:4200      |
-| Backend FastAPI  | http://localhost:8000      |
-| Swagger API      | http://localhost:8000/docs |
+| Backend FastAPI  | http://localhost:8011      |
+| Swagger API      | http://localhost:8011/docs |
 | Grafana          | http://localhost:3000      |
 | Prometheus       | http://localhost:9090      |
 
@@ -201,7 +201,7 @@ docker compose up -d --build
 # 📡 Exemple de Métriques Prometheus
 
 ```bash
-curl http://localhost:8000/metrics/metrics
+curl http://localhost:8011/metrics/metrics
 ```
 
 Métriques exposées :

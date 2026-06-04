@@ -13,8 +13,8 @@ export class WebsocketService {
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {
     if (isPlatformBrowser(this.platformId)) {
       // ✅ WebSocket activé uniquement côté client
-      this.socket$ = new WebSocketSubject('ws://localhost:8000/ws/payments');
-      this.logSocket$ = webSocket('ws://localhost:8000/ws/logs');
+      this.socket$ = new WebSocketSubject('ws://localhost:8011/ws/payments');
+      this.logSocket$ = webSocket('ws://localhost:8011/ws/logs');
     }
   }
 

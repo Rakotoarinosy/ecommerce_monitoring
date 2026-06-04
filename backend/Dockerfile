@@ -12,7 +12,7 @@ COPY app/ ./app/
 RUN pip install --default-timeout=100 --no-cache-dir -r requirements.txt
 
 # Exposer le port de l'API
-EXPOSE 8000
+EXPOSE 8011
 
 # Lancer l'application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8011", "--reload"]
