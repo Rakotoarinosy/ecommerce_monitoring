@@ -2,6 +2,7 @@ import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Observable } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root',
@@ -13,8 +14,12 @@ export class WebsocketService {
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {
     if (isPlatformBrowser(this.platformId)) {
       // ✅ WebSocket activé uniquement côté client
-      this.socket$ = new WebSocketSubject('ws://localhost:8011/ws/payments');
-      this.logSocket$ = webSocket('ws://localhost:8011/ws/logs');
+      this.socket$ = new WebSocketSubject(
+        `${environment.wsUrl}/ws/payments`
+      );
+      this.logSocket$ = webSocket(
+        `${environment.wsUrl}/ws/logs`
+      );
     }
   }
 
