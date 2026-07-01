@@ -56,7 +56,7 @@ services:
     image: mongo:6
     container_name: ecommerce_mongodb
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongodb_data:/data/db
     networks:
@@ -66,13 +66,16 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
     restart: unless-stopped
 
   redis:
     image: redis:alpine
     container_name: ecommerce_redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -241,7 +244,7 @@ services:
       ports:
         - "9216:9216"
       environment:
-        - MONGODB_URI=mongodb://mongodb:27017
+        - MONGODB_URI=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/?authSource=admin
       command:
         - --collect-all
         - --compatible-mode
