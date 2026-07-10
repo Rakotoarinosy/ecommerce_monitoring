@@ -1,62 +1,105 @@
-<!-- Begin Page Content -->
-<div class="container-fluid">
-  <h1 class="h3 mb-2 text-gray-800">📌 Paiements Récents</h1>
-  <button class="btn btn-primary" (click)="initiatePayment()" [disabled]="loading">
-    <span *ngIf="loading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-    💳 Payer maintenant
-  </button>
+<div class="container-fluid px-4 py-3">
+  
+  <!-- En-tête de page moderne avec Flexbox -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h1 class="h4 fw-bold text-dark mb-1">
+        <i class="fas fa-receipt text-muted me-2 fs-5"></i>Paiements Récents
+      </h1>
+      <p class="text-muted small mb-0">
+        Consultez et suivez en temps réel le montant, le statut et l'état de prédiction de chaque transaction effectuée.
+      </p>
+    </div>
+    
+    <!-- Bouton d'action épuré -->
+    <button class="btn btn-primary d-inline-flex align-items-center gap-2 px-3 py-2 rounded-3 shadow-sm border-0" 
+            (click)="initiatePayment()" 
+            [disabled]="loading">
+      <span *ngIf="loading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      <i *ngIf="!loading" class="fas fa-credit-card"></i>
+      <span>Payer maintenant</span>
+    </button>
+  </div>
 
-  <!-- Page Heading -->
-  <p class="mb-4">Consultez les paiements récents effectués par les utilisateurs. Vous pouvez voir le montant, le statut et la date de chaque paiement.</p>
-
-  <!-- DataTales Example -->
-  <div class="card shadow mb-4">
-      <div class="card-header py-3">
-          <h6 class="m-0 font-weight-bold text-primary">Paiements Récents</h6>
+  <!-- Carte de données minimaliste -->
+  <div class="card border-0 shadow-sm rounded-3">
+    <!-- Header discret sans fond coloré agressif -->
+    <div class="card-header bg-white border-bottom py-3">
+      <div class="d-flex align-items-center gap-2">
+        <span class="p-1.5 bg-light rounded-2 text-primary d-inline-flex">
+          <i class="fas fa-list-ul small"></i>
+        </span>
+        <h6 class="m-0 fw-semibold text-dark">Historique des transactions</h6>
       </div>
-      <div class="card-body">
-          <div class="table-responsive">
-              <table class="table table-bordered" id="paymentsTable" width="100%" cellspacing="0">
-                  <thead class="table-dark">
-                    <tr>
-                      <th>ID</th>
-                      <th>User_id</th>
-                      <th>Montant</th>
-                      <th>Status</th>
-                      <th>Date</th>
-                      <th>Etat</th>
-                    </tr>
-                  </thead>
-                  <tfoot class="table-dark">
-                    <tr>
-                      <th>ID</th>
-                      <th>User_id</th>
-                      <th>Montant</th>
-                      <th>Status</th>
-                      <th>Date</th>
-                      <th>Etat</th>
-                    </tr>
-                  </tfoot>
-                  <tbody>
-                    <tr *ngFor="let payment of payments" [ngClass]="{'table-success': payment.status === 'success', 'table-danger': payment.status === 'failed', 'table-warning': payment.status === 'pending'}">
-                      <td>{{ payment.id }}</td>
-                      <td>{{ payment.user_id }}</td>
-                      <td>{{ payment.amount | currency:'USD' }}</td>
-                      <td>
-                        <span [ngClass]="{
-                          'badge bg-success': payment.status === 'success',
-                          'badge bg-danger': payment.status === 'failed',
-                          'badge bg-warning': payment.status === 'pending'
+    </div>
+    
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <!-- Tableau sans bordures verticales pour un effet aéré -->
+        <table class="table table-hover align-middle mb-0" id="paymentsTable">
+          <thead class="table-light text-muted small text-uppercase">
+            <tr>
+              <th class="ps-4 py-3">ID</th>
+              <th class="py-3">Utilisateur (ID)</th>
+              <th class="py-3">Montant</th>
+              <th class="py-3">Statut</th>
+              <th class="py-3">Date</th>
+              <th class="pe-4 py-3">État / Prédiction</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Si aucune donnée n'est disponible (Optionnel mais recommandé) -->
+            <tr *ngIf="payments?.length === 0">
+              <td colspan="6" class="text-center py-5 text-muted">
+                <i class="fas fa-inbox fs-2 mb-3 d-block text-opacity-25"></i>
+                Aucun paiement enregistré.
+              </td>
+            </tr>
+
+            <!-- Lignes de données -->
+            <tr *ngFor="let payment of payments">
+              <td class="ps-4 fw-medium text-secondary">#{{ payment.id }}</td>
+              <td>
+                <span class="font-monospace small bg-light px-2 py-1 rounded text-dark">
+                  {{ payment.user_id }}
+                </span>
+              </td>
+              <td class="fw-semibold text-dark">
+                {{ payment.amount | currency:'USD' }}
+              </td>
+              <td>
+                <!-- Badges au format Pastel Moderne -->
+                <span class="badge px-2.5 py-1.5 rounded-pill fw-medium text-capitalize" 
+                      [ngClass]="{
+                        'bg-success-subtle text-success border border-success-subtle': payment.status === 'success',
+                        'bg-danger-subtle text-danger border border-danger-subtle': payment.status === 'failed',
+                        'bg-warning-subtle text-warning border border-warning-subtle': payment.status === 'pending'
+                      }">
+                  <span class="d-inline-block rounded-circle me-1" 
+                        style="width: 6px; height: 6px;"
+                        [ngClass]="{
+                          'bg-success': payment.status === 'success',
+                          'bg-danger': payment.status === 'failed',
+                          'bg-warning': payment.status === 'pending'
                         }">
-                          {{ payment.status }}
-                        </span>
-                      </td>
-                      <td>{{ payment.created_at | date: 'short' }}</td>
-                      <td>{{ payment.prediction }}</td>
-                    </tr>
-                  </tbody>
-              </table>
-          </div>
+                  </span>
+                  {{ payment.status }}
+                </span>
+              </td>
+              <td class="text-muted small">
+                {{ payment.created_at | date: 'mediumDate' }} 
+                <span class="d-block text-opacity-50 small">{{ payment.created_at | date: 'shortTime' }}</span>
+              </td>
+              <td class="pe-4">
+                <!-- Style propre pour la colonne prédiction -->
+                <span class="small text-secondary fw-medium">
+                  {{ payment.prediction || '-' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
+    </div>
   </div>
 </div>
