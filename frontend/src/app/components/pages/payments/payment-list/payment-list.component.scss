@@ -1,0 +1,168 @@
+/* =================================
+   PAGE
+================================= */
+
+.payments-page {
+    width: 100%;
+    max-width: 100%;
+}
+
+
+/* =================================
+   HEADER
+================================= */
+
+.page-title {
+    min-width: 0;
+}
+
+.page-title p {
+    max-width: 750px;
+    line-height: 1.5;
+}
+
+.payment-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+
+/* =================================
+   TABLE
+================================= */
+
+#paymentsTable {
+    min-width: 850px;
+}
+
+#paymentsTable th {
+    white-space: nowrap;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+#paymentsTable td {
+    vertical-align: middle;
+}
+
+
+/* =================================
+   STATUS
+================================= */
+
+.status-dot {
+    display: inline-block;
+
+    width: 6px;
+    height: 6px;
+
+    border-radius: 50%;
+}
+
+
+/* =================================
+   MOBILE CARDS
+================================= */
+
+.mobile-payment-card {
+    border-bottom: 1px solid #edf0f4;
+}
+
+.mobile-payment-card:last-child {
+    border-bottom: none;
+}
+
+.mobile-amount {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #212529;
+}
+
+
+.payment-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+
+.info-label {
+    display: block;
+
+    margin-bottom: 3px;
+
+    color: #8a94a6;
+
+    font-size: 0.7rem;
+    font-weight: 600;
+
+    text-transform: uppercase;
+}
+
+
+.info-value {
+    display: block;
+
+    color: #495057;
+
+    font-size: 0.85rem;
+    font-weight: 500;
+
+    overflow-wrap: anywhere;
+}
+
+
+/* =================================
+   TABLETTE
+================================= */
+
+@media (max-width: 991.98px) {
+
+    .payments-page {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+}
+
+
+/* =================================
+   MOBILE
+================================= */
+
+@media (max-width: 767.98px) {
+
+    .page-header {
+        margin-bottom: 1rem !important;
+    }
+
+
+    .payment-btn {
+        width: 100%;
+    }
+
+
+    .card {
+        border-radius: 10px !important;
+    }
+
+}
+
+
+/* =================================
+   PETIT MOBILE
+================================= */
+
+@media (max-width: 400px) {
+
+    .payment-info-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+
+    .mobile-amount {
+        font-size: 1.2rem;
+    }
+
+}

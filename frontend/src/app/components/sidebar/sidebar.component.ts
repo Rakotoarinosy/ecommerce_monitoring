@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
-import { RouterLink, RouterModule } from '@angular/router';
+import { RouterLink, RouterModule, Router, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 
 @Component({
   selector: 'app-sidebar',
@@ -13,4 +14,25 @@ export class SidebarComponent {
   profile: any = "assets/img/undraw_profile.svg";
   image_eo : any = 'assets/img/EO.png';
 
+  sidebarOpen = false;
+
+  constructor(private router: Router) {
+
+    this.router.events
+      .pipe(
+        filter(event => event instanceof NavigationEnd)
+      )
+      .subscribe(() => {
+        this.sidebarOpen = false;
+      });
+
+  }
+
+  toggleSidebar(): void {
+    this.sidebarOpen = !this.sidebarOpen;
+  }
+
+  closeSidebar(): void {
+    this.sidebarOpen = false;
+  }
 }

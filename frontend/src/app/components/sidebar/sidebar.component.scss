@@ -1,0 +1,164 @@
+/* ==============================
+   LAYOUT
+================================ */
+
+.app-wrapper {
+    width: 100%;
+    overflow-x: hidden;
+}
+
+
+/* ==============================
+   SIDEBAR DESKTOP
+================================ */
+
+.visual-sidebar {
+    width: 280px;
+    min-width: 280px;
+    height: 100vh;
+
+    position: sticky;
+    top: 0;
+
+    z-index: 1040;
+
+    transition:
+        transform 0.3s ease,
+        box-shadow 0.3s ease;
+}
+
+
+/* ==============================
+   TOPBAR
+================================ */
+
+.search-form {
+    width: 300px;
+}
+
+.burger-btn {
+    width: 42px;
+    height: 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 10px;
+}
+
+.notification-dropdown {
+    width: 280px;
+}
+
+
+/* ==============================
+   OVERLAY
+================================ */
+
+.sidebar-overlay {
+    display: none;
+}
+
+
+/* ==============================
+   TABLETTE + MOBILE
+================================ */
+
+@media (max-width: 991.98px) {
+
+    .visual-sidebar {
+        position: fixed;
+
+        top: 0;
+        left: 0;
+
+        width: 280px;
+        min-width: 280px;
+
+        height: 100vh;
+
+        transform: translateX(-100%);
+
+        box-shadow: none;
+
+        z-index: 1050;
+    }
+
+
+    .visual-sidebar.sidebar-open {
+        transform: translateX(0);
+
+        box-shadow:
+            4px 0 20px rgba(0, 0, 0, 0.15);
+    }
+
+
+    .sidebar-overlay {
+        display: block;
+
+        position: fixed;
+
+        inset: 0;
+
+        background: rgba(0, 0, 0, 0.45);
+
+        opacity: 0;
+        visibility: hidden;
+
+        transition:
+            opacity 0.3s ease,
+            visibility 0.3s ease;
+
+        z-index: 1045;
+    }
+
+
+    .sidebar-overlay.show {
+        opacity: 1;
+        visibility: visible;
+    }
+
+
+    main {
+        padding: 1.25rem !important;
+    }
+
+}
+
+
+/* ==============================
+   PETIT MOBILE
+================================ */
+
+@media (max-width: 575.98px) {
+
+    .visual-sidebar {
+        width: 85%;
+        min-width: 85%;
+        max-width: 300px;
+    }
+
+
+    header {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+
+    main {
+        padding: 1rem !important;
+    }
+
+
+    footer {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+
+    .notification-dropdown {
+        width: min(280px, calc(100vw - 30px));
+    }
+
+}
