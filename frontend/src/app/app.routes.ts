@@ -39,12 +39,12 @@ export const routes: Routes = [
     // Redirection par défaut
     {
       path: '',
-      redirectTo: 'back-office',
+      redirectTo: 'back-office/list-payments',
       pathMatch: 'full',
     },
     // Route wildcard pour capturer les erreurs 404
     {
       path: '**',
-      redirectTo: 'back-office',
+      redirectTo: 'back-office/list-payments',
     },
 ];

@@ -55,8 +55,7 @@ export class PaymentListComponent implements OnInit {
   initiatePayment(): void {
     this.loading = true;
     const userId = "123"; // Remplacez par l'ID utilisateur réel
-    const amount = 1900; // Remplacez par le montant réel
-
+    const amount = 35
     this.paymentService.createCheckoutSession(userId, amount).subscribe(
       (response) => {
         console.log('Réponse du serveur:', response); // Affiche la valeur retournée
