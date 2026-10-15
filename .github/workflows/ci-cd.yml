@@ -2,7 +2,7 @@
 #   Pull request → tests de la passerelle (Mongo/Redis réels), image backend, build Angular.
 #   Push sur main → mêmes vérifications, puis déploiement sur le VPS et contrôle de santé.
 #
-# Variables du dépôt : DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH (défaut /srv/ecommerce_monitoring)
+# Variables ou secrets : DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH (défaut /srv/ecommerce_monitoring)
 # Secrets du dépôt   : DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
 
 name: CI/CD
@@ -94,9 +94,10 @@ jobs:
     steps:
       - name: Déploiement par SSH
         env:
-          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/srv/ecommerce_monitoring' }}
+          # Acceptés en variables ou en secrets du dépôt.
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST || secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER || secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || secrets.DEPLOY_PATH || '/srv/ecommerce_monitoring' }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
