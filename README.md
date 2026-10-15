@@ -251,6 +251,8 @@ Réponse `201` :
 ```
 
 Enregistrer `id` sur la commande, puis rediriger le navigateur vers `checkout_url`.
+En mode Stripe, un montant inférieur à l'équivalent de 0,50 € (≈ 2 500 Ar) est refusé par Stripe :
+la passerelle répond alors `502 Fournisseur de paiement indisponible`.
 Relancer un paiement pour la même `merchant_reference` annule l'intention précédente encore en attente.
 
 ### Étape 3 — Confirmer le paiement
