@@ -86,149 +86,82 @@
           id="paymentsTable">
 
           <thead class="table-light text-muted small text-uppercase">
-
             <tr>
-
-              <th class="ps-4 py-3">
-                ID
-              </th>
-
-              <th class="py-3">
-                Utilisateur
-              </th>
-
-              <th class="py-3">
-                Montant
-              </th>
-
-              <th class="py-3">
-                Statut
-              </th>
-
-              <th class="py-3">
-                Date
-              </th>
-
-              <th class="pe-4 py-3">
-                État / Prédiction
-              </th>
-
+              <th class="ps-4 py-3">Paiement</th>
+              <th class="py-3">Client</th>
+              <th class="py-3 text-end">Montant</th>
+              <th class="py-3">Moyen</th>
+              <th class="py-3">Statut</th>
+              <th class="py-3">Date</th>
+              <th class="pe-4 py-3">Prédiction</th>
             </tr>
-
           </thead>
 
-
           <tbody>
-
-            <!-- VIDE -->
             <tr *ngIf="payments?.length === 0">
-
-              <td
-                colspan="6"
-                class="text-center py-5 text-muted">
-
-                <i
-                  class="fas fa-inbox fs-2 mb-3 d-block opacity-25">
-                </i>
-
+              <td colspan="7" class="text-center py-5 text-muted">
+                <i class="fas fa-inbox fs-2 mb-3 d-block opacity-25"></i>
                 Aucun paiement enregistré.
-
               </td>
-
             </tr>
 
-
-            <!-- DONNÉES -->
             <tr *ngFor="let payment of payments">
-
-              <td class="ps-4 fw-medium text-secondary">
-                #{{ payment.id }}
+              <!-- Origine + identifiant -->
+              <td class="ps-4">
+                <span class="source-badge" [class.shop]="isFromShop(payment)">
+                  <i class="fas" [ngClass]="isFromShop(payment) ? 'fa-store' : 'fa-chart-line'"></i>
+                  {{ isFromShop(payment) ? 'BazarStore' : 'Monitoring' }}
+                </span>
+                <div class="payment-ref mt-1">
+                  {{ payment.order_reference || ('#' + shortId(payment)) }}
+                </div>
+                <div *ngIf="payment.order_reference" class="payment-id" [title]="payment.id">
+                  {{ shortId(payment) }}
+                </div>
               </td>
 
+              <!-- Client -->
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="avatar">{{ initials(payment) }}</span>
+                  <div class="min-w-0">
+                    <div class="fw-semibold text-dark text-truncate">{{ customerName(payment) }}</div>
+                    <div *ngIf="payment.customer_email" class="small text-muted text-truncate">
+                      {{ payment.customer_email }}
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+              <td class="fw-semibold text-dark text-end text-nowrap">{{ formatAmount(payment) }}</td>
+
+              <td class="small text-secondary text-nowrap">
+                <i class="fas me-1" [ngClass]="payment.provider === 'simulator' ? 'fa-flask' : 'fa-credit-card'"></i>
+                {{ providerLabel(payment) }}
+              </td>
 
               <td>
-
-                <span
-                  class="font-monospace small bg-light
-                         px-2 py-1 rounded text-dark">
-
-                  {{ payment.user_id }}
-
+                <span class="badge rounded-pill fw-medium px-2 py-1"
+                      [ngClass]="'bg-' + status(payment).tone + '-subtle text-' + status(payment).tone">
+                  <span class="status-dot me-1" [ngClass]="'bg-' + status(payment).tone"></span>
+                  {{ status(payment).label }}
                 </span>
-
               </td>
 
-
-              <td class="fw-semibold text-dark">
-
-                {{ payment.amount | currency:'USD' }}
-
+              <td class="text-muted small text-nowrap">
+                {{ payment.created_at | date:'d MMM y' }}
+                <span class="d-block opacity-75">{{ payment.created_at | date:'HH:mm' }}</span>
               </td>
-
-
-              <td>
-
-                <span
-                  class="badge px-2 py-1 rounded-pill fw-medium text-capitalize"
-
-                  [ngClass]="{
-                    'bg-success-subtle text-success':
-                      payment.status === 'success',
-
-                    'bg-danger-subtle text-danger':
-                      payment.status === 'failed',
-
-                    'bg-warning-subtle text-warning':
-                      payment.status === 'pending'
-                  }">
-
-                  <span
-                    class="status-dot me-1"
-
-                    [ngClass]="{
-                      'bg-success':
-                        payment.status === 'success',
-
-                      'bg-danger':
-                        payment.status === 'failed',
-
-                      'bg-warning':
-                        payment.status === 'pending'
-                    }">
-                  </span>
-
-                  {{ payment.status }}
-
-                </span>
-
-              </td>
-
-
-              <td class="text-muted small">
-
-                {{ payment.created_at | date:'mediumDate' }}
-
-                <span class="d-block opacity-75">
-
-                  {{ payment.created_at | date:'shortTime' }}
-
-                </span>
-
-              </td>
-
 
               <td class="pe-4">
-
-                <span class="small text-secondary fw-medium">
-
-                  {{ payment.prediction || '-' }}
-
+                <span *ngIf="payment.prediction; else noPrediction" class="prediction"
+                      [class.anomaly]="isAnomaly(payment)">
+                  <i class="fas" [ngClass]="isAnomaly(payment) ? 'fa-exclamation-triangle' : 'fa-shield-alt'"></i>
+                  {{ isAnomaly(payment) ? 'Anomalie' : 'Normal' }}
                 </span>
-
+                <ng-template #noPrediction><span class="text-muted">—</span></ng-template>
               </td>
-
             </tr>
-
           </tbody>
 
         </table>
@@ -262,126 +195,47 @@
 
 
       <!-- CARTES PAIEMENTS -->
-
-      <div
-        *ngFor="let payment of payments"
-        class="mobile-payment-card p-3">
-
-        <!-- TOP -->
-
-        <div
-          class="d-flex justify-content-between
-                 align-items-start gap-2 mb-3">
-
-          <div>
-
-            <span class="text-muted small">
-              Paiement
+      <div *ngFor="let payment of payments" class="mobile-payment-card p-3">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+          <div class="min-w-0">
+            <span class="source-badge" [class.shop]="isFromShop(payment)">
+              {{ isFromShop(payment) ? 'BazarStore' : 'Monitoring' }}
             </span>
-
-            <div class="fw-semibold text-dark">
-              #{{ payment.id }}
-            </div>
-
+            <div class="payment-ref mt-1">{{ payment.order_reference || ('#' + shortId(payment)) }}</div>
           </div>
-
-
-          <!-- STATUS -->
-
-          <span
-            class="badge px-2 py-1 rounded-pill
-                   fw-medium text-capitalize"
-
-            [ngClass]="{
-              'bg-success-subtle text-success':
-                payment.status === 'success',
-
-              'bg-danger-subtle text-danger':
-                payment.status === 'failed',
-
-              'bg-warning-subtle text-warning':
-                payment.status === 'pending'
-            }">
-
-            <span
-              class="status-dot me-1"
-
-              [ngClass]="{
-                'bg-success':
-                  payment.status === 'success',
-
-                'bg-danger':
-                  payment.status === 'failed',
-
-                'bg-warning':
-                  payment.status === 'pending'
-              }">
-            </span>
-
-            {{ payment.status }}
-
+          <span class="badge rounded-pill fw-medium px-2 py-1"
+                [ngClass]="'bg-' + status(payment).tone + '-subtle text-' + status(payment).tone">
+            <span class="status-dot me-1" [ngClass]="'bg-' + status(payment).tone"></span>
+            {{ status(payment).label }}
           </span>
-
         </div>
 
-
-        <!-- MONTANT -->
-
-        <div class="mobile-amount mb-3">
-
-          {{ payment.amount | currency:'USD' }}
-
-        </div>
-
-
-        <!-- INFORMATIONS -->
+        <div class="mobile-amount mb-3">{{ formatAmount(payment) }}</div>
 
         <div class="payment-info-grid">
-
           <div>
-
-            <span class="info-label">
-              Utilisateur
-            </span>
-
-            <span class="info-value font-monospace">
-              {{ payment.user_id }}
-            </span>
-
+            <span class="info-label">Client</span>
+            <span class="info-value">{{ customerName(payment) }}</span>
+            <span *ngIf="payment.customer_email" class="info-value small text-muted">{{ payment.customer_email }}</span>
           </div>
-
-
           <div>
-
-            <span class="info-label">
-              Prédiction
-            </span>
-
-            <span class="info-value">
-              {{ payment.prediction || '-' }}
-            </span>
-
+            <span class="info-label">Moyen</span>
+            <span class="info-value">{{ providerLabel(payment) }}</span>
           </div>
-
+          <div>
+            <span class="info-label">Prédiction</span>
+            <span *ngIf="payment.prediction; else noPredictionMobile" class="prediction"
+                  [class.anomaly]="isAnomaly(payment)">
+              {{ isAnomaly(payment) ? 'Anomalie' : 'Normal' }}
+            </span>
+            <ng-template #noPredictionMobile><span class="info-value">—</span></ng-template>
+          </div>
         </div>
 
-
-        <!-- DATE -->
-
-        <div
-          class="border-top mt-3 pt-2
-                 d-flex align-items-center gap-2 text-muted small">
-
+        <div class="border-top mt-3 pt-2 d-flex align-items-center gap-2 text-muted small">
           <i class="far fa-clock"></i>
-
-          <span>
-            {{ payment.created_at | date:'mediumDate' }}
-            à
-            {{ payment.created_at | date:'shortTime' }}
-          </span>
-
+          <span>{{ payment.created_at | date:'d MMM y' }} à {{ payment.created_at | date:'HH:mm' }}</span>
         </div>
-
       </div>
 
     </div>

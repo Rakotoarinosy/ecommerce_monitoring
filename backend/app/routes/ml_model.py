@@ -30,3 +30,13 @@ def predict_payment(payment: dict) -> dict:
     prediction = model.predict(X_scaled)[0]
     payment["prediction"] = "normal" if prediction == 1 else "anomalie 🚨"
     return payment
+
+
+def predict_by_currency(payment: dict) -> dict:
+    """Le modèle a été entraîné en USD : un montant MGA est converti avant la prédiction."""
+    from app.config import MGA_PER_USD
+
+    if payment.get("currency", "USD") != "MGA":
+        return predict_payment(payment)
+    scored = predict_payment({**payment, "amount": payment["amount"] / MGA_PER_USD})
+    return {**payment, "prediction": scored["prediction"]}

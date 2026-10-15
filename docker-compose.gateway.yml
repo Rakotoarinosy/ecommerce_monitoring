@@ -1,0 +1,50 @@
+# Passerelle de paiement seule (API + MongoDB + Redis).
+# Sert au développement local de BazarStore et aux tests de contrat en CI.
+#
+# Fournisseur : Stripe (mode test) si backend/.env contient STRIPE_SECRET_KEY → vraie page
+# Stripe Checkout ; sinon simulateur (CI). Forcer avec GATEWAY_PROVIDER=simulator|stripe.
+#
+#   docker compose -f docker-compose.gateway.yml up -d --build
+#   → API      http://localhost:8011/docs
+#   → BazarStore local : PAYMENT_GATEWAY_URL=http://localhost:8011
+#
+# Les webhooks repartent vers le backend BazarStore lancé sur la machine hôte (port 8000).
+# Pour le tableau de bord complet (Angular, Grafana, Prometheus…), utiliser docker-compose.dev.yml.
+
+name: payment-gateway
+
+services:
+  gateway:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8011
+    ports:
+      - "8011:8011"
+    # Clés Stripe de test (fichier local, ignoré par Git) ; absent en CI.
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      MONGO_URI: mongodb://mongodb:27017
+      MONGO_DB_NAME: gateway
+      REDIS_HOST: redis
+      GATEWAY_PROVIDER: ${GATEWAY_PROVIDER:-}
+      GATEWAY_PUBLIC_URL: http://localhost:8011
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:-local-gateway-key}
+      GATEWAY_WEBHOOK_SECRET: ${GATEWAY_WEBHOOK_SECRET:-local-gateway-webhook-secret}
+      GATEWAY_MERCHANT_WEBHOOK_URL: ${GATEWAY_MERCHANT_WEBHOOK_URL:-http://host.docker.internal:8000/api/v1/orders/payments/gateway/webhook}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - mongodb
+      - redis
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8011/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  mongodb:
+    image: mongo:6
+
+  redis:
+    image: redis:alpine

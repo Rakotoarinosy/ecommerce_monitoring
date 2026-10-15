@@ -21,7 +21,7 @@ groups:
 
       # Alerte si paiement anormalement élevé (> 5000$)
       - alert: SuspiciousPaymentAmount
-        expr: increase(ecommerce_payments_amount_total{status="success"}[1m]) > 5000
+        expr: increase(ecommerce_payments_amount_total{status="success", currency="USD"}[1m]) > 5000
         for: 0m
         labels:
           severity: warning

@@ -32,7 +32,7 @@
 ================================= */
 
 #paymentsTable {
-    min-width: 850px;
+    min-width: 980px;
 }
 
 #paymentsTable th {
@@ -57,6 +57,72 @@
     height: 6px;
 
     border-radius: 50%;
+}
+
+
+/* =================================
+   ORIGINE, CLIENT, PRÉDICTION
+================================= */
+
+.min-w-0 {
+    min-width: 0;
+}
+
+.source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #4338ca;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.source-badge.shop {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.payment-ref {
+    color: #212529;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.payment-id {
+    color: #8a94a6;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.7rem;
+}
+
+.avatar {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #e7ecf5;
+    color: #3b4a66;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.prediction {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #047857;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.prediction.anomaly {
+    color: #b91c1c;
 }
 
 

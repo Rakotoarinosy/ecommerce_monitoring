@@ -1,14 +1,14 @@
 from datetime import datetime
 import json
 import os
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import RedirectResponse
 import stripe
 from app.models import Payment
 from app.config import db, redis_client, logger
 from app.routes.websockets import notify_payment_clients
 from app.tasks import log_to_redis  # Importer la fonction log_to_redis
-from app.routes.ml_model import predict_payment
+from app.routes.ml_model import predict_by_currency
 
 
 router = APIRouter()
@@ -64,7 +64,7 @@ def serialize_payment(payment):
         created_at_iso = created_at.isoformat()
     elif isinstance(created_at, str):
         try:
-            created_at_obj = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
+            created_at_obj = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
             created_at_iso = created_at_obj.isoformat()
         except ValueError:
             created_at_iso = None
@@ -79,10 +79,16 @@ def serialize_payment(payment):
         "amount": payment.get("amount"),
         "status": payment.get("status"),
         "created_at": created_at_iso,
+        "currency": payment.get("currency", "USD"),
+        "source": payment.get("source", "Monitoring"),
+        "provider": payment.get("provider"),
+        "order_reference": payment.get("order_reference"),
+        "customer_name": payment.get("customer_name"),
+        "customer_email": payment.get("customer_email"),
     }
 
     # 🔎 Ajouter la prédiction d’anomalie
-    payment_with_prediction = predict_payment(payment_dict)
+    payment_with_prediction = predict_by_currency(payment_dict)
 
     print(f"Payment with prediction: {payment_with_prediction}")  # Debugging line
     
@@ -90,7 +96,8 @@ def serialize_payment(payment):
     from app.services.metrics_service import record_payment, record_anomaly
     record_payment(
         status=payment_dict.get("status", "unknown"),
-        amount=payment_dict.get("amount", 0)
+        amount=payment_dict.get("amount", 0),
+        currency=payment_dict.get("currency", "USD"),
     )
     if payment_with_prediction.get("prediction") == "anomalie 🚨":
         record_anomaly()
@@ -215,7 +222,7 @@ async def payment_success(session_id: str):
 
 # ✅ Route pour gérer les webhooks Stripe
 @router.post("/webhook")
-async def stripe_webhook(request: Request):
+async def stripe_webhook(request: Request, background: BackgroundTasks):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
@@ -234,6 +241,13 @@ async def stripe_webhook(request: Request):
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
+        # Session créée par la passerelle (/v1/payment-intents) : traitée par la passerelle.
+        intent_id = (session.get("metadata") or {}).get("payment_intent_id")
+        if intent_id:
+            from app.routes.gateway import complete_from_stripe
+
+            await complete_from_stripe(intent_id, background)
+            return {"status": "success"}
         user_id = session.get("metadata", {}).get("user_id")
 
         if user_id:

@@ -7,9 +7,9 @@ from app.routes.metrics import (
     stripe_webhooks_total,
 )
 
-def record_payment(status: str, amount: float):
+def record_payment(status: str, amount: float, currency: str = "USD"):
     payments_total.labels(status=status).inc()
-    payments_amount_total.labels(status=status).inc(amount)
+    payments_amount_total.labels(status=status, currency=currency).inc(amount)
 
 def record_anomaly():
     anomalies_detected_total.inc()

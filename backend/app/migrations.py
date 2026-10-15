@@ -18,6 +18,13 @@ def setup_database():
             "status": "init",
             "created_at": "2025-02-10T00:00:00Z"
         })
+
+    # Passerelle : identifiant d'intention unique, recherche par commande marchande.
+    db.payments.create_index(
+        "id", unique=True, name="uniq_payment_intent_id",
+        partialFilterExpression={"id": {"$type": "string"}},
+    )
+    db.payments.create_index([("source", 1), ("source_order_id", 1)], name="merchant_order")
     
     if "logs" not in collections:
         logger.info("✅ Création de la collection 'logs' avec un document initial...")

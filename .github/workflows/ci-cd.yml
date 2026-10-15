@@ -1,0 +1,130 @@
+# CI/CD ecommerce_monitoring (passerelle de paiement + monitoring)
+#   Pull request → tests de la passerelle (Mongo/Redis réels), image backend, build Angular.
+#   Push sur main → mêmes vérifications, puis déploiement sur le VPS et contrôle de santé.
+#
+# Variables du dépôt : DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH (défaut /srv/ecommerce_monitoring)
+# Secrets du dépôt   : DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  gateway-tests:
+    name: Passerelle · tests (MongoDB + Redis)
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:6
+        ports: ["27017:27017"]
+      redis:
+        image: redis:alpine
+        ports: ["6379:6379"]
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      MONGO_URI: mongodb://localhost:27017
+      REDIS_HOST: localhost
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+  backend-image:
+    name: Backend · image Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  frontend:
+    name: Frontend · build production
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+      - run: npx ng build --configuration production
+
+  deploy:
+    name: Déploiement VPS
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [gateway-tests, backend-image, frontend]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://ecommerce.rakotoarinosy.com
+    steps:
+      - name: Déploiement par SSH
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/srv/ecommerce_monitoring' }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          : "${DEPLOY_HOST:?Set the DEPLOY_HOST repository variable}"
+          : "${DEPLOY_USER:?Set the DEPLOY_USER repository variable}"
+          : "${DEPLOY_SSH_KEY:?Set the DEPLOY_SSH_KEY repository secret}"
+          : "${DEPLOY_KNOWN_HOSTS:?Set the DEPLOY_KNOWN_HOSTS repository secret}"
+
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          chmod 600 "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+          # --no-deps : seuls les services applicatifs sont reconstruits ; MongoDB, Redis,
+          # Grafana, Prometheus… et leurs volumes ne sont jamais recréés par un déploiement.
+          printf -v remote_path '%q' "$DEPLOY_PATH"
+          ssh \
+            -i "$RUNNER_TEMP/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "set -e; cd $remote_path && git switch main && git pull --ff-only origin main \
+             && docker compose up -d --build --no-deps backend frontend celery_worker celery_beat \
+             && docker image prune -f"
+
+      - name: Vérification HTTPS
+        run: |
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors \
+            https://ecommerce-api.rakotoarinosy.com/health
+          echo "Passerelle en ligne."

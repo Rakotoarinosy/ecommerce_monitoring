@@ -25,9 +25,9 @@ payments_amount_total = Counter(
 
     "ecommerce_payments_amount_total",
 
-    "Montant total des paiements en USD",
+    "Montant total des paiements par devise",
 
-    ["status"]
+    ["status", "currency"]
 
 )
 
@@ -76,6 +76,26 @@ stripe_webhooks_total = Counter(
     "Webhooks Stripe recus",
 
     ["event_type"]
+
+)
+
+gateway_intents_total = Counter(
+
+    "gateway_payment_intents_total",
+
+    "Intentions de paiement de la passerelle par statut",
+
+    ["status", "provider"]
+
+)
+
+gateway_webhooks_total = Counter(
+
+    "gateway_merchant_webhooks_total",
+
+    "Webhooks envoyes aux marchands",
+
+    ["result"]
 
 )
 
