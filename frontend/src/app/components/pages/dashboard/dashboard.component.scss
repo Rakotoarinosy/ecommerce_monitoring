@@ -1,0 +1,111 @@
+.min-w-0 { min-width: 0; }
+
+.kpi .card-body { padding: 1.25rem 1.25rem 1.1rem; }
+
+.kpi-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    margin-bottom: 0.75rem;
+}
+
+.kpi-label {
+    color: #8a94a6;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.kpi-value {
+    color: #1f2937;
+    font-size: 1.6rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+}
+
+.kpi-hint { color: #6b7280; font-size: 0.8rem; }
+
+/* Histogramme 14 jours */
+.bars {
+    display: grid;
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    gap: 6px;
+    height: 230px;
+    align-items: end;
+}
+
+.bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    min-width: 0;
+}
+
+.bar-value {
+    height: 18px;
+    color: #4b5563;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.bar-track {
+    display: flex;
+    flex: 1;
+    align-items: flex-end;
+    width: 100%;
+    max-width: 34px;
+    background: #f3f5f9;
+    border-radius: 6px;
+}
+
+.bar {
+    width: 100%;
+    min-height: 2px;
+    background: #4e73df;
+    border-radius: 6px;
+    transition: height 0.3s ease;
+}
+
+.bar-label {
+    margin-top: 6px;
+    color: #8a94a6;
+    font-size: 0.65rem;
+    white-space: nowrap;
+}
+
+.split-title {
+    margin-bottom: 0.6rem;
+    color: #8a94a6;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.split-row + .split-row { margin-top: 0.75rem; }
+
+.latest-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #eef2ff;
+    color: #4338ca;
+}
+
+.latest-icon.shop { background: #ecfdf5; color: #047857; }
+
+.amount { min-width: 110px; }
+
+@media (max-width: 575.98px) {
+    .bar-label { display: none; }
+    .amount { min-width: 0; }
+}

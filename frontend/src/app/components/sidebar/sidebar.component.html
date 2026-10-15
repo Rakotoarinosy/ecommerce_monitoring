@@ -18,7 +18,7 @@
         <div class="d-flex align-items-center justify-content-between mb-4">
 
             <a
-                href="https://ecommerce-grafana.rakotoarinosy.com"
+                routerLink="/back-office/dashboard"
                 class="d-flex align-items-center gap-2 px-2 text-decoration-none text-dark fw-bold fs-5">
 
                 <i class="fas fa-chart-line text-primary"></i>
@@ -67,30 +67,27 @@
                 <i class="fas fa-file-alt fs-5"></i>
                 <span>Logs</span>
             </a>
-            <a href="https://ecommerce-grafana.rakotoarinosy.com" target="_blank" class="nav-link text-secondary d-flex align-items-center gap-3 py-2 px-3 rounded-3">
+            <a href="https://ecommerce-grafana.rakotoarinosy.com" target="_blank" rel="noopener" class="nav-link text-secondary d-flex align-items-center gap-3 py-2 px-3 rounded-3">
                 <i class="fas fa-chart-bar fs-5"></i>
-                <span>Monitoring</span>
+                <span>Grafana</span>
+                <i class="fas fa-external-link-alt ms-auto small opacity-50"></i>
             </a>
 
-            <!-- Section: Paramètres -->
-            <div class="small fw-bold text-uppercase text-muted mt-4 mb-2 px-3">Paramètres</div>
-            
-            <a routerLink="/back-office/users" routerLinkActive="active text-white bg-primary" class="nav-link text-secondary d-flex align-items-center gap-3 py-2 px-3 rounded-3">
-                <i class="fas fa-users fs-5"></i>
-                <span>Utilisateurs</span>
-            </a>
-            <a routerLink="/back-office/settings" routerLinkActive="active text-white bg-primary" class="nav-link text-secondary d-flex align-items-center gap-3 py-2 px-3 rounded-3">
-                <i class="fas fa-cogs fs-5"></i>
-                <span>Paramètres</span>
+            <!-- Section: Outils (liens externes réels) -->
+            <div class="small fw-bold text-uppercase text-muted mt-4 mb-2 px-3">Outils</div>
+            <a [href]="apiDocsUrl" target="_blank" rel="noopener" class="nav-link text-secondary d-flex align-items-center gap-3 py-2 px-3 rounded-3">
+                <i class="fas fa-book fs-5"></i>
+                <span>Documentation API</span>
+                <i class="fas fa-external-link-alt ms-auto small opacity-50"></i>
             </a>
         </nav>
 
-        <!-- Footer Sidebar (Optionnel - Profil simplifié) -->
-        <div class="border-top pt-3 mt-auto d-flex align-items-center gap-2">
-            <img [src]="profile" alt="Avatar" class="rounded-circle" width="36" height="36">
+        <!-- Footer Sidebar : état de la passerelle -->
+        <div class="border-top pt-3 mt-auto d-flex align-items-center gap-2 px-2">
+            <span class="gateway-dot" [class.online]="apiOnline"></span>
             <div class="overflow-hidden">
-                <p class="mb-0 text-dark fw-semibold small text-truncate">Douglas McGee</p>
-                <span class="text-muted d-block small text-truncate">Admin</span>
+                <p class="mb-0 text-dark fw-semibold small text-truncate">Passerelle de paiement</p>
+                <span class="text-muted d-block small text-truncate">{{ apiOnline ? 'API en ligne' : 'API injoignable' }}</span>
             </div>
         </div>
     </aside>
@@ -117,21 +114,18 @@
                     </button>
 
 
-                    <!-- Recherche -->
-                    <form class="d-none d-md-block search-form">
-
+                    <!-- Recherche : ouvre Transactions filtrées -->
+                    <form class="d-none d-md-block search-form" (ngSubmit)="search()">
                         <div
                             class="input-group input-group-sm border rounded-3 bg-light px-2 py-1 align-items-center">
-
                             <i class="fas fa-search text-muted me-2"></i>
-
                             <input
-                                type="text"
+                                type="search"
+                                name="q"
+                                [(ngModel)]="searchQuery"
                                 class="form-control bg-transparent border-0 p-0 shadow-none"
-                                placeholder="Rechercher...">
-
+                                placeholder="Client, référence CMD-…, e-mail">
                         </div>
-
                     </form>
 
                 </div>
@@ -140,124 +134,50 @@
                 <!-- Menu droite -->
                 <ul class="navbar-nav flex-row align-items-center gap-2 gap-md-3">
 
-                    <!-- Notifications -->
-                    <li class="nav-item dropdown">
-
+                    <!-- Notifications : anomalies et paiements échoués -->
+                    <li class="nav-item dropdown alerts-menu">
                         <button
+                            type="button"
                             class="btn btn-link text-secondary position-relative p-2 border-0 shadow-none"
-                            data-bs-toggle="dropdown">
-
+                            (click)="toggleAlerts($event)"
+                            [attr.aria-expanded]="alertsOpen"
+                            aria-label="Alertes">
                             <i class="fas fa-bell fs-5"></i>
-
                             <span
+                                *ngIf="(alerts$ | async)?.length as count"
                                 class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
                                 style="font-size: 0.65rem;">
-
-                                3
-
+                                {{ count }}
                             </span>
-
                         </button>
-
-
-                        <ul
-                            class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3 mt-2 notification-dropdown">
-
-                            <li>
-                                <h6 class="dropdown-header">
-                                    Centre d'alertes
-                                </h6>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3 mt-2 notification-dropdown"
+                            [class.show]="alertsOpen">
+                            <li><h6 class="dropdown-header">Centre d'alertes</h6></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li *ngIf="!(alerts$ | async)?.length">
+                                <span class="dropdown-item-text small text-muted">Aucune anomalie ni paiement échoué.</span>
                             </li>
-
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-
-                            <li>
-                                <a class="dropdown-item py-2 small" href="#">
-                                    <strong>Nouveau rapport !</strong>
+                            <li *ngFor="let alert of alerts$ | async">
+                                <a class="dropdown-item py-2 small" routerLink="/back-office/transactions"
+                                   [queryParams]="{ q: alert.order_reference || alert.id }">
+                                    <strong [class.text-danger]="isAnomaly(alert)">
+                                        {{ isAnomaly(alert) ? 'Anomalie détectée' : 'Paiement échoué' }}
+                                    </strong>
+                                    · {{ formatAmount(alert.amount, alert.currency) }}
                                     <br>
                                     <span class="text-muted">
-                                        Il y a 10m
+                                        {{ customerName(alert) }} · {{ alert.created_at | date:'d MMM, HH:mm' }}
                                     </span>
                                 </a>
                             </li>
-
-                            <li>
-                                <a class="dropdown-item py-2 small" href="#">
-                                    <strong>Paiement reçu</strong>
-                                    <br>
-                                    <span class="text-muted">
-                                        Il y a 1h
-                                    </span>
-                                </a>
-                            </li>
-
                         </ul>
-
                     </li>
-
-
                     <div class="vr text-muted opacity-25 d-none d-sm-block"></div>
-
-
-                    <!-- Profil -->
-                    <li class="nav-item dropdown">
-
-                        <button
-                            class="btn btn-link d-flex align-items-center gap-2 text-decoration-none text-dark border-0 p-0 shadow-none"
-                            data-bs-toggle="dropdown">
-
-                            <img
-                                [src]="profile"
-                                alt="Avatar"
-                                class="rounded-circle"
-                                width="32"
-                                height="32">
-
-                            <span class="d-none d-lg-inline small fw-medium">
-                                Douglas McGee
-                            </span>
-
-                        </button>
-
-
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3 mt-2">
-
-                            <li>
-                                <a class="dropdown-item small" href="#">
-                                    <i class="fas fa-user me-2 text-muted"></i>
-                                    Profil
-                                </a>
-                            </li>
-
-                            <li>
-                                <a class="dropdown-item small" href="#">
-                                    <i class="fas fa-cogs me-2 text-muted"></i>
-                                    Paramètres
-                                </a>
-                            </li>
-
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-
-                            <li>
-                                <button
-                                    class="dropdown-item small text-danger"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#logoutModal">
-
-                                    <i class="fas fa-sign-out-alt me-2"></i>
-                                    Déconnexion
-
-                                </button>
-                            </li>
-
-                        </ul>
-
+                    <!-- Profil (pas d'authentification sur ce back-office) -->
+                    <li class="nav-item d-flex align-items-center gap-2">
+                        <span class="admin-avatar"><i class="fas fa-user-shield"></i></span>
+                        <span class="d-none d-lg-inline small fw-medium text-dark">Administrateur</span>
                     </li>
-
                 </ul>
 
             </div>
@@ -271,27 +191,8 @@
 
         <!-- Footer Épuré -->
         <footer class="bg-white border-top py-3 px-4 text-center text-muted small">
-            <div>Copyright &copy; MonitorCorp 2026</div>
+            <div>E-commerce Monitoring · passerelle de paiement BazarStore · {{ year }}</div>
         </footer>
 
-    </div>
-</div>
-
-<!-- Modal Déconnexion (Bootstrap 5 Standard) -->
-<div class="modal fade" id="logoutModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header">
-                <h5 class="modal-title">Prêt à partir ?</h5>
-                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-muted">
-                Sélectionnez "Déconnexion" ci-dessous si vous êtes prêt à fermer votre session actuelle.
-            </div>
-            <div class="modal-footer border-0">
-                <button class="btn btn-light rounded-3 btn-sm" type="button" data-bs-dismiss="modal">Annuler</button>
-                <a class="btn btn-danger rounded-3 btn-sm" href="/login">Déconnexion</a>
-            </div>
-        </div>
     </div>
 </div>

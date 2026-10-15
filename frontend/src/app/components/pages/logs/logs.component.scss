@@ -1,0 +1,29 @@
+.level { min-width: 72px; font-size: 0.68rem; }
+
+.message { overflow-wrap: anywhere; }
+
+.live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #ecfdf5;
+    color: #047857;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.live-pill.off { background: #f3f4f6; color: #6b7280; }
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    50% { opacity: 0.35; }
+}

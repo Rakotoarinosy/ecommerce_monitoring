@@ -8,6 +8,8 @@ services:
 
   backend:
     build: ./backend
+    # Image construite une seule fois, réutilisée par celery_worker et celery_beat.
+    image: ecommerce_monitoring-backend:latest
     container_name: ecommerce_backend
     ports:
       - "8011:8011"
@@ -92,7 +94,8 @@ services:
   # ════════════════════════════════════════════════════════════════════
 
   celery_worker:
-    build: ./backend
+    image: ecommerce_monitoring-backend:latest
+    pull_policy: never
     container_name: ecommerce_celery_worker
     env_file:
       - ./backend/.env
@@ -110,7 +113,8 @@ services:
     restart: unless-stopped
 
   celery_beat:
-    build: ./backend
+    image: ecommerce_monitoring-backend:latest
+    pull_policy: never
     container_name: ecommerce_celery_beat
     env_file:
       - ./backend/.env

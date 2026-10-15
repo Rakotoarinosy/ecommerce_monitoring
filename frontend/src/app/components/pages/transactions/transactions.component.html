@@ -1,0 +1,150 @@
+<div class="transactions container-fluid px-2 px-sm-3 px-lg-4 py-3">
+
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h1 class="h4 fw-bold text-dark mb-1">
+        <i class="fas fa-exchange-alt text-muted me-2 fs-5"></i>
+        Transactions
+      </h1>
+      <p class="text-muted small mb-0">
+        Recherchez, filtrez et exportez l'ensemble des paiements (BazarStore et monitoring).
+      </p>
+    </div>
+    <button class="btn btn-primary rounded-3 btn-sm px-3" type="button" (click)="exportCsv()" [disabled]="!rows.length">
+      <i class="fas fa-file-csv me-1"></i> Exporter en CSV ({{ rows.length }})
+    </button>
+  </div>
+
+  <!-- FILTRES -->
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-lg-4">
+          <label class="filter-label" for="tx-search">Recherche</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+            <input id="tx-search" type="search" class="form-control" placeholder="Client, e-mail, référence CMD-…, identifiant"
+                   [(ngModel)]="query" (ngModelChange)="applyFilters()">
+          </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+          <label class="filter-label" for="tx-status">Statut</label>
+          <select id="tx-status" class="form-select form-select-sm" [(ngModel)]="status" (ngModelChange)="applyFilters()">
+            <option value="">Tous</option>
+            <option value="success">Payé</option>
+            <option value="pending">En attente</option>
+            <option value="failed">Échoué</option>
+            <option value="cancelled">Annulé</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+          <label class="filter-label" for="tx-source">Origine</label>
+          <select id="tx-source" class="form-select form-select-sm" [(ngModel)]="source" (ngModelChange)="applyFilters()">
+            <option value="">Toutes</option>
+            <option value="BazarStore">BazarStore</option>
+            <option value="Monitoring">Monitoring</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+          <label class="filter-label" for="tx-provider">Moyen</label>
+          <select id="tx-provider" class="form-select form-select-sm" [(ngModel)]="provider" (ngModelChange)="applyFilters()">
+            <option value="">Tous</option>
+            <option *ngFor="let label of providers" [value]="label">{{ label }}</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+          <label class="filter-label" for="tx-period">Période</label>
+          <select id="tx-period" class="form-select form-select-sm" [(ngModel)]="period" (ngModelChange)="applyFilters()">
+            <option value="all">Tout</option>
+            <option value="today">Aujourd'hui</option>
+            <option value="7d">7 derniers jours</option>
+            <option value="30d">30 derniers jours</option>
+          </select>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+        <div class="form-check form-switch m-0">
+          <input class="form-check-input" type="checkbox" id="tx-anomalies" [(ngModel)]="anomaliesOnly" (ngModelChange)="applyFilters()">
+          <label class="form-check-label small" for="tx-anomalies">Anomalies uniquement</label>
+        </div>
+        <button *ngIf="hasFilters" class="btn btn-link btn-sm text-decoration-none p-0" type="button" (click)="reset()">
+          <i class="fas fa-times me-1"></i> Réinitialiser les filtres
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOTAUX DU FILTRE -->
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <span class="total-chip"><strong>{{ rows.length }}</strong> transaction(s)</span>
+    <span class="total-chip" *ngFor="let total of totals">
+      Encaissé {{ total.currency }} : <strong>{{ formatAmount(total.paid, total.currency) }}</strong>
+    </span>
+  </div>
+
+  <!-- TABLEAU -->
+  <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light text-muted small text-uppercase">
+          <tr>
+            <th class="ps-4 py-3">Date</th>
+            <th class="py-3">Référence</th>
+            <th class="py-3">Client</th>
+            <th class="py-3 text-end">Montant</th>
+            <th class="py-3">Moyen</th>
+            <th class="py-3">Statut</th>
+            <th class="pe-4 py-3">Prédiction</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="!rows.length">
+            <td colspan="7" class="text-center py-5 text-muted">
+              <i class="fas fa-search fs-2 mb-3 d-block opacity-25"></i>
+              Aucune transaction ne correspond à ces filtres.
+            </td>
+          </tr>
+          <tr *ngFor="let p of visible; trackBy: trackById">
+            <td class="ps-4 small text-muted text-nowrap">
+              {{ p.created_at | date:'d MMM y' }}<span class="d-block opacity-75">{{ p.created_at | date:'HH:mm' }}</span>
+            </td>
+            <td>
+              <span class="source-dot" [class.shop]="sourceOf(p) === 'BazarStore'"></span>
+              <span class="fw-semibold text-dark">{{ p.order_reference || sourceOf(p) }}</span>
+              <div class="small text-muted font-monospace text-truncate ref-id" [title]="p.id">{{ p.id }}</div>
+            </td>
+            <td>
+              <div class="fw-semibold text-dark">{{ customerName(p) }}</div>
+              <div class="small text-muted" *ngIf="p.customer_email">{{ p.customer_email }}</div>
+            </td>
+            <td class="text-end fw-semibold text-dark text-nowrap">{{ formatAmount(p.amount, p.currency) }}</td>
+            <td class="small text-secondary text-nowrap">{{ providerLabel(p) }}</td>
+            <td>
+              <span class="badge rounded-pill fw-medium px-2 py-1"
+                    [ngClass]="'bg-' + statusOf(p).tone + '-subtle text-' + statusOf(p).tone">{{ statusOf(p).label }}</span>
+            </td>
+            <td class="pe-4 small fw-semibold" [class.text-danger]="isAnomaly(p)" [class.text-success]="p.prediction && !isAnomaly(p)">
+              {{ isAnomaly(p) ? 'Anomalie' : p.prediction ? 'Normal' : '—' }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- PAGINATION -->
+    <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top small" *ngIf="rows.length">
+      <span class="text-muted">
+        {{ (page - 1) * pageSize + 1 }}–{{ (page - 1) * pageSize + visible.length }} sur {{ rows.length }}
+      </span>
+      <div class="btn-group btn-group-sm">
+        <button class="btn btn-light border" type="button" [disabled]="page === 1" (click)="page = page - 1">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <button class="btn btn-light border" type="button" disabled>{{ page }} / {{ pageCount }}</button>
+        <button class="btn btn-light border" type="button" [disabled]="page === pageCount" (click)="page = page + 1">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

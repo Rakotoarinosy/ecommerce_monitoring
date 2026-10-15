@@ -162,3 +162,39 @@
     }
 
 }
+/* État de la passerelle (pied de la barre latérale) */
+.gateway-dot {
+    flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #dc3545;
+    box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.15);
+}
+
+.gateway-dot.online {
+    background: #198754;
+    box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.15);
+}
+
+.admin-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #eef2ff;
+    color: #4338ca;
+    font-size: 0.85rem;
+}
+
+.alerts-menu { position: relative; }
+
+.alerts-menu .dropdown-menu.show {
+    position: absolute;
+    right: 0;
+    left: auto;
+    display: block;
+    min-width: 300px;
+}

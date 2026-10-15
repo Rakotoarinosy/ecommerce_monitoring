@@ -20,6 +20,10 @@ export const routes: Routes = [
             loadComponent: () => import('./components/pages/dashboard/dashboard.component').then(m => m.DashboardComponent),
         },
         {
+            path: 'transactions',
+            loadComponent: () => import('./components/pages/transactions/transactions.component').then(m => m.TransactionsComponent),
+        },
+        {
             path: 'logs',
             loadComponent: () => import('./components/pages/logs/logs.component').then(m => m.LogsComponent),
         },
@@ -33,7 +37,7 @@ export const routes: Routes = [
             },
           ],
         },
-        { path: '', redirectTo: 'process-payment', pathMatch: 'full' },
+        { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       ],
     },
     // Redirection par défaut
