@@ -27,3 +27,12 @@
 @keyframes pulse {
     50% { opacity: 0.35; }
 }
+
+.nav-tabs .nav-link { color: #6b7280; font-size: 0.9rem; }
+.nav-tabs .nav-link.active { color: #1f2937; font-weight: 600; }
+
+.search-box { min-width: 280px; }
+
+@media (max-width: 575.98px) {
+    .search-box { min-width: 0; width: 100%; }
+}

@@ -4,6 +4,7 @@
     pip install -r requirements-dev.txt && pytest -q
 """
 
+import json
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -14,9 +15,16 @@ WEBHOOK_PORT = 8765
 os.environ.update(
     MONGO_URI=os.getenv("MONGO_URI", "mongodb://localhost:27017"),
     MONGO_DB_NAME="gateway_test",
-    GATEWAY_API_KEY="test-api-key",
-    GATEWAY_WEBHOOK_SECRET="test-webhook-secret",
-    GATEWAY_MERCHANT_WEBHOOK_URL=f"http://127.0.0.1:{WEBHOOK_PORT}/webhook",
+    # Deux projets : BazarStore (avec webhook) et un second projet sans webhook.
+    GATEWAY_MERCHANTS=json.dumps([
+        {
+            "name": "BazarStore",
+            "api_key": "test-api-key",
+            "webhook_url": f"http://127.0.0.1:{WEBHOOK_PORT}/webhook",
+            "webhook_secret": "test-webhook-secret",
+        },
+        {"name": "AutreProjet", "api_key": "other-api-key"},
+    ]),
     GATEWAY_PROVIDER="simulator",
     GATEWAY_PUBLIC_URL="http://gateway.test",
 )
@@ -51,7 +59,8 @@ def merchant_inbox():
 
 @pytest.fixture
 def client(merchant_inbox):
-    db.payments.delete_many({"source": "BazarStore"})
+    db.payments.delete_many({"source": {"$in": ["BazarStore", "AutreProjet"]}})
+    db.logs.delete_many({})
     merchant_inbox.clear()
     with TestClient(app) as test_client:
         yield test_client

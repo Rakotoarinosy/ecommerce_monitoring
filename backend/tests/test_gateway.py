@@ -100,3 +100,21 @@ def test_dashboard_lists_gateway_payments_in_mga(client):
     assert row["provider"] == "simulator"
     assert row["amount"] == 1_328_000
     assert row["prediction"] in {"normal", "anomalie 🚨"}
+
+
+def test_projects_are_isolated_from_each_other(client, merchant_inbox):
+    other = {"Authorization": "Bearer other-api-key"}
+    shop_intent = _create(client)
+    # Un projet ne peut pas lire l'intention d'un autre.
+    assert client.get(f"/v1/payment-intents/{shop_intent['id']}", headers=other).status_code == 404
+
+    response = client.post("/v1/payment-intents", json={**INTENT, "merchant_reference": "o-1"}, headers=other)
+    assert response.status_code == 201
+    own = response.json()
+    assert client.get(f"/v1/payment-intents/{own['id']}", headers=other).json()["status"] == "pending"
+    assert "AutreProjet" in client.get(own["checkout_url"].replace("http://gateway.test", "")).text
+
+    # Sans webhook configuré pour ce projet : aucun envoi, le paiement aboutit quand même.
+    client.post(f"/v1/simulator/checkout/{own['id']}", data={"action": "pay"}, follow_redirects=False)
+    assert client.get(f"/v1/payment-intents/{own['id']}", headers=other).json()["status"] == "success"
+    assert merchant_inbox == []

@@ -116,8 +116,13 @@ export function providerLabel(payment: Payment): string {
   return PROVIDERS[payment?.provider ?? ''] ?? 'Carte · Stripe';
 }
 
+/** Projet à l'origine du paiement (BazarStore, autre projet branché sur la passerelle, ou Monitoring). */
 export function sourceOf(payment: Payment): string {
-  return payment?.source === 'BazarStore' ? 'BazarStore' : 'Monitoring';
+  return payment?.source || 'Monitoring';
+}
+
+export function isMerchantPayment(payment: Payment): boolean {
+  return sourceOf(payment) !== 'Monitoring';
 }
 
 export function customerName(payment: Payment): string {

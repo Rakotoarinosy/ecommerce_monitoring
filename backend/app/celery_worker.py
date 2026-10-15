@@ -24,9 +24,10 @@ celery.conf.update(
 
 # Planification de tâches périodiques avec Celery Beat
 celery.conf.beat_schedule = {
-    "save_logs_every_minute": {
+    # Les logs restent 5 min dans Redis (page « En direct ») avant d'être archivés dans MongoDB.
+    "save_logs_every_5_minutes": {
         "task": "app.tasks.save_logs",
-        "schedule": crontab(minute="*/1"),
+        "schedule": crontab(minute="*/5"),
         "options": {"queue": "celery"}
     },
     "retrain_model_daily": {

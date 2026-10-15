@@ -64,7 +64,9 @@ Afin d’améliorer les performances et la scalabilité du système :
 
 * Redis est utilisé comme broker de messages
 * Celery permet le traitement asynchrone
-* les logs critiques sont enregistrés en arrière-plan
+* les logs restent **5 minutes** dans Redis (onglet « En direct » de la page Logs), puis Celery
+  Beat les archive dans MongoDB (onglet « Historique », API `GET /logs/history?level=&q=&skip=&limit=`)
+* l'archivage lit et vide Redis de façon atomique : aucun log n'est perdu entre deux passages
 * les tâches longues sont découplées du backend principal
 
 Cela permet :
@@ -168,55 +170,189 @@ ecommerce_monitoring/
 
 # ⚙️ Installation
 
-## Passerelle de paiement pour BazarStore
+## 💳 Passerelle de paiement réutilisable
 
-L'API sert aussi de **passerelle de paiement** : BazarStore ne détient plus aucune clé Stripe.
-Montants en ariary (`MGA`, devise sans centimes chez Stripe).
+L'API sert de **passerelle de paiement** pour n'importe quel projet : BazarStore l'utilise déjà,
+et tout autre projet (boutique, réservation, SaaS…) peut s'y brancher sans détenir de clé Stripe.
+Chaque paiement apparaît ensuite dans ce tableau de bord, passe par le modèle d'anomalies et
+alimente Prometheus/Grafana.
 
 ```
-Client ─► BazarStore API ── POST /v1/payment-intents ──► Passerelle ──► Stripe Checkout | Simulateur
-              ▲                                              │
-              └──── webhook signé HMAC-SHA256 ───────────────┘──► MongoDB · ML · Prometheus/Grafana
+Client ─► Backend du projet ── POST /v1/payment-intents ──► Passerelle ──► Stripe Checkout | Simulateur
+                 ▲                                              │
+                 └──── webhook signé HMAC-SHA256 ───────────────┘──► MongoDB · ML · Prometheus/Grafana
 ```
 
-| Endpoint | Rôle |
-| --- | --- |
-| `POST /v1/payment-intents` | Crée une intention (`Authorization: Bearer <GATEWAY_API_KEY>`), renvoie `checkout_url` |
-| `GET /v1/payment-intents/{id}` | Statut (`pending`, `success`, `failed`, `cancelled`), relit Stripe si besoin |
-| `GET/POST /v1/simulator/checkout/{id}` | Page de paiement factice (mode `simulator`) : payer, refuser, annuler |
-| `POST /payments/webhook` | Webhook Stripe (sessions de la passerelle reconnues par `metadata.payment_intent_id`) |
+### Le webhook seul ne suffit pas : 3 échanges
 
-À chaque état final, la passerelle envoie au marchand `payment_intent.succeeded|failed|cancelled`
-avec l'en-tête `X-Gateway-Signature: t=<unix>,v1=<hmac_sha256(secret, "<t>.<corps>")>`. BazarStore
-vérifie la signature (fenêtre de 5 min contre le rejeu) et relit aussi l'intention au retour du client :
-un webhook perdu ne bloque jamais une commande. Une transition `pending → final` n'a lieu qu'une fois
-(écriture conditionnelle Mongo), donc un seul webhook par paiement.
+| # | Qui | Quoi |
+| --- | --- | --- |
+| 1 | Backend du projet → passerelle | `POST /v1/payment-intents` crée le paiement et renvoie `checkout_url` |
+| 2 | Navigateur du client | Redirigé vers `checkout_url`, il paie, puis revient sur `success_url` ou `cancel_url` |
+| 3 | Passerelle → backend du projet | Webhook signé `payment_intent.succeeded` / `failed` / `cancelled` |
+
+Le webhook est une **accélération**, pas la seule source de vérité : au retour du client sur
+`success_url`, le projet relit l'intention (`GET /v1/payment-intents/{id}`). Un webhook perdu
+(réseau, redéploiement) ne bloque donc jamais une commande. En local, Stripe ne peut pas
+joindre la passerelle : c'est cette relecture qui confirme le paiement.
+
+### Étape 1 — Déclarer le projet sur la passerelle
+
+Chaque projet a son nom, sa clé API et son webhook. Dans `backend/.env` de la passerelle :
+
+```env
+# Plusieurs projets (JSON sur une ligne). Générer chaque secret : openssl rand -hex 32
+GATEWAY_MERCHANTS=[{"name":"BazarStore","api_key":"<clé-1>","webhook_url":"https://api.bazarstore.rakotoarinosy.com/api/v1/orders/payments/gateway/webhook","webhook_secret":"<secret-1>"},{"name":"MonProjet","api_key":"<clé-2>","webhook_url":"https://api.monprojet.com/payments/webhook","webhook_secret":"<secret-2>"}]
+```
+
+Un seul projet ? Les variables `GATEWAY_API_KEY`, `GATEWAY_WEBHOOK_SECRET`,
+`GATEWAY_MERCHANT_WEBHOOK_URL` et `GATEWAY_MERCHANT_NAME` suffisent (configuration actuelle de BazarStore).
+`webhook_url` et `webhook_secret` sont facultatifs : sans eux, le projet se contente de relire l'intention.
+Un projet ne voit **jamais** les paiements d'un autre (réponse 404). Redémarrer le backend après modification.
+
+Dans le `.env` **serveur** du projet (jamais dans un frontend ni dans Git) :
+
+```env
+PAYMENT_GATEWAY_URL=https://ecommerce-api.rakotoarinosy.com
+PAYMENT_GATEWAY_API_KEY=<clé-2>
+PAYMENT_GATEWAY_WEBHOOK_SECRET=<secret-2>
+```
+
+### Étape 2 — Créer le paiement (côté serveur)
+
+```http
+POST /v1/payment-intents
+Authorization: Bearer <clé API du projet>
+Content-Type: application/json
+
+{
+  "merchant_reference": "order-42",          // identifiant de la commande dans le projet (obligatoire)
+  "amount": 301000,                          // entier, en ariary (MGA n'a pas de centimes)
+  "currency": "MGA",
+  "description": "Commande CMD-42",
+  "order_reference": "CMD-42",               // facultatif : affiché dans le tableau de bord
+  "customer_name": "Rasoa Hanta",            // facultatif
+  "customer_email": "hanta@example.com",     // facultatif : pré-rempli sur Stripe
+  "lines": [                                 // facultatif ; si présent, la somme doit égaler amount
+    {"name": "Coffret détente", "unit_amount": 185000, "quantity": 1},
+    {"name": "T-shirt bleu", "unit_amount": 116000, "quantity": 1}
+  ],
+  "success_url": "https://monprojet.com/commandes/42?payment=success",
+  "cancel_url": "https://monprojet.com/commandes/42?payment=cancelled"
+}
+```
+
+Réponse `201` :
+
+```json
+{ "id": "pi_3b65a7d42ae316c7f3976cb2", "merchant_reference": "order-42", "amount": 301000,
+  "currency": "MGA", "status": "pending", "provider": "stripe",
+  "checkout_url": "https://checkout.stripe.com/c/pay/cs_test_…", "created_at": "…", "paid_at": null }
+```
+
+Enregistrer `id` sur la commande, puis rediriger le navigateur vers `checkout_url`.
+Relancer un paiement pour la même `merchant_reference` annule l'intention précédente encore en attente.
+
+### Étape 3 — Confirmer le paiement
+
+**Au retour du client** : `GET /v1/payment-intents/{id}` (même en-tête `Authorization`).
+
+| `status` | Signification | Action du projet |
+| --- | --- | --- |
+| `pending` | Pas encore payé | Attendre, proposer de vérifier à nouveau |
+| `success` | Payé | Confirmer la commande (une seule fois) |
+| `failed` | Carte refusée ou session expirée | Proposer de réessayer |
+| `cancelled` | Annulé, ou remplacé par une nouvelle tentative | Proposer de réessayer |
+
+**Webhook** : la passerelle envoie un `POST` sur `webhook_url` à chaque état final, une seule fois :
+
+```http
+POST <webhook_url>
+X-Gateway-Signature: t=1760572800,v1=5f2b…   ← HMAC-SHA256(webhook_secret, "<t>.<corps brut>")
+Content-Type: application/json
+
+{"id":"evt_…","type":"payment_intent.succeeded","created":1760572800,
+ "data":{"id":"pi_…","merchant_reference":"order-42","amount":301000,"currency":"MGA","status":"success",…}}
+```
+
+À vérifier **sur le corps brut**, avant tout parsing : signature, puis horodatage (5 min maximum
+contre le rejeu), puis que `data.id` est bien l'intention en cours de la commande. Répondre `2xx`.
+
+Python (FastAPI) :
+
+```python
+import hashlib, hmac, json, os, time
+from fastapi import HTTPException, Request
+
+SECRET = os.environ["PAYMENT_GATEWAY_WEBHOOK_SECRET"]
+
+async def gateway_webhook(request: Request):
+    body = await request.body()
+    try:
+        parts = dict(p.split("=", 1) for p in request.headers["x-gateway-signature"].split(","))
+        expected = hmac.new(SECRET.encode(), f"{parts['t']}.".encode() + body, hashlib.sha256).hexdigest()
+        valid = hmac.compare_digest(parts["v1"], expected) and abs(time.time() - int(parts["t"])) <= 300
+    except (KeyError, ValueError):
+        valid = False
+    if not valid:
+        raise HTTPException(400, "Signature invalide")
+    intent = json.loads(body)["data"]
+    # Retrouver la commande par intent["merchant_reference"], vérifier intent["id"],
+    # puis appliquer intent["status"] si la commande est encore en attente.
+```
+
+Node.js (Express) :
+
+```js
+const crypto = require('crypto');
+const SECRET = process.env.PAYMENT_GATEWAY_WEBHOOK_SECRET;
+
+app.post('/payments/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  const parts = Object.fromEntries((req.get('x-gateway-signature') || '').split(',').map(p => p.split('=')));
+  const expected = crypto.createHmac('sha256', SECRET).update(`${parts.t}.`).update(req.body).digest('hex');
+  const valid = parts.v1 && parts.v1.length === expected.length
+    && crypto.timingSafeEqual(Buffer.from(parts.v1), Buffer.from(expected))
+    && Math.abs(Date.now() / 1000 - Number(parts.t)) <= 300;
+  if (!valid) return res.status(400).send('Signature invalide');
+  const intent = JSON.parse(req.body).data;   // appliquer intent.status à la commande intent.merchant_reference
+  res.sendStatus(204);
+});
+```
+
+Implémentation de référence complète (client, routes, tests) : BazarStore,
+`backend/src/infrastructure/external/payment_gateway.py`.
+
+### Checklist d'intégration
+
+- [ ] Projet déclaré dans `GATEWAY_MERCHANTS`, backend de la passerelle redémarré
+- [ ] Clé API et secret uniquement dans le `.env` serveur du projet
+- [ ] Intention créée côté serveur, `id` enregistré sur la commande
+- [ ] Relecture `GET /v1/payment-intents/{id}` au retour sur `success_url`
+- [ ] Webhook : signature vérifiée sur le corps brut, rejeu refusé, traitement idempotent
+- [ ] Montants en entiers MGA, identiques à ceux de la commande
+- [ ] Testé en local avec le simulateur, puis avec Stripe test (carte `4242 4242 4242 4242`)
+
+### Fournisseurs, local et production
+
+| Mode | Quand | Page de paiement |
+| --- | --- | --- |
+| `stripe` | `STRIPE_SECRET_KEY` défini (prod, ou local avec clé de test) | Stripe Checkout |
+| `simulator` | Aucune clé, ou `GATEWAY_PROVIDER=simulator` (CI, démo) | Page « Payer / Refuser / Annuler » |
+
+```bash
+# Passerelle seule en local (API + Mongo + Redis) → http://localhost:8011/docs
+docker compose -f docker-compose.gateway.yml up -d --build
+```
+
+En production : `GATEWAY_PROVIDER=stripe`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` et les projets
+dans `backend/.env` (voir `backend/.env.template`). Webhook Stripe à déclarer une seule fois pour
+tous les projets : `https://ecommerce-api.rakotoarinosy.com/payments/webhook`, événement
+`checkout.session.completed`.
 
 Le modèle d'anomalies ayant été entraîné en USD, les montants MGA sont convertis
 (`MGA_PER_USD`, 4500 par défaut) avant la prédiction ; l'affichage reste en ariary.
 Métriques : `gateway_payment_intents_total{status,provider}`, `gateway_merchant_webhooks_total{result}`.
-
-### En local
-
-```bash
-docker compose -f docker-compose.gateway.yml up -d --build    # API + Mongo + Redis
-# STRIPE_SECRET_KEY=sk_test_… dans backend/.env → vraie page Stripe Checkout (carte 4242 4242 4242 4242)
-# sans clé, ou GATEWAY_PROVIDER=simulator → page de paiement simulée (utilisée par la CI)
-# BazarStore/backend/.env :
-#   PAYMENTS_ENABLED=true
-#   PAYMENT_GATEWAY_URL=http://localhost:8011
-#   PAYMENT_GATEWAY_API_KEY=local-gateway-key
-#   PAYMENT_GATEWAY_WEBHOOK_SECRET=local-gateway-webhook-secret
-```
-
 Tests : `cd backend && pip install -r requirements-dev.txt && pytest -q` (MongoDB et Redis sur localhost).
-
-### En production
-
-Dans `backend/.env` du VPS : `GATEWAY_PROVIDER=stripe`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
-`GATEWAY_API_KEY`, `GATEWAY_WEBHOOK_SECRET`, `GATEWAY_MERCHANT_WEBHOOK_URL` (voir `backend/.env.template`).
-Les deux secrets sont partagés avec BazarStore (`PAYMENT_GATEWAY_API_KEY`, `PAYMENT_GATEWAY_WEBHOOK_SECRET`).
-Endpoint du webhook Stripe : `https://ecommerce-api.rakotoarinosy.com/payments/webhook`.
 
 ## Déploiement continu avec GitHub Actions
 

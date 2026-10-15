@@ -103,6 +103,10 @@ export class TransactionsComponent implements OnInit, OnDestroy {
     return this.rows.slice((this.page - 1) * this.pageSize, this.page * this.pageSize);
   }
 
+  get sources(): string[] {
+    return [...new Set(this.all.map(sourceOf))].sort();
+  }
+
   get providers(): string[] {
     return [...new Set(this.all.map(providerLabel))].sort();
   }

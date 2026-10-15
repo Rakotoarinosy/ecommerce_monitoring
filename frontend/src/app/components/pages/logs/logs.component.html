@@ -3,36 +3,92 @@
     <div>
       <h1 class="h4 fw-bold text-dark mb-1">
         <i class="fas fa-file-alt text-muted me-2 fs-5"></i>
-        Logs en temps réel
+        Logs
       </h1>
       <p class="text-muted small mb-0">
-        Derniers événements de l'API (paiements, passerelle, erreurs), rafraîchis chaque seconde.
+        Événements de l'API (paiements, passerelle, erreurs). Les logs restent 5 minutes « en direct »,
+        puis sont archivés dans l'historique.
       </p>
     </div>
-    <span class="live-pill" [class.off]="!connected">
+    <span class="live-pill" [class.off]="!connected" *ngIf="tab === 'live'">
       <span class="live-dot"></span>{{ connected ? 'En direct' : 'Connexion…' }}
     </span>
   </div>
 
-  <div class="d-flex flex-wrap gap-2 mb-3">
-    <button type="button" class="btn btn-sm rounded-pill px-3"
-            [ngClass]="level === '' ? 'btn-dark' : 'btn-light border'" (click)="level = ''">Tous</button>
-    <button type="button" class="btn btn-sm rounded-pill px-3 text-capitalize" *ngFor="let item of levels"
-            [ngClass]="level === item ? 'btn-dark' : 'btn-light border'" (click)="level = item">{{ item }}</button>
-  </div>
+  <!-- ONGLETS -->
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <button type="button" class="nav-link" [class.active]="tab === 'live'" (click)="selectTab('live')">
+        <i class="fas fa-broadcast-tower me-1"></i> En direct
+        <span class="badge rounded-pill bg-light text-dark ms-1">{{ liveLogs.length }}</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button type="button" class="nav-link" [class.active]="tab === 'history'" (click)="selectTab('history')">
+        <i class="fas fa-history me-1"></i> Historique
+        <span class="badge rounded-pill bg-light text-dark ms-1" *ngIf="historyTotal">{{ historyTotal }}</span>
+      </button>
+    </li>
+  </ul>
 
-  <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
-    <div class="list-group list-group-flush">
-      <div class="list-group-item text-center text-muted py-5" *ngIf="!visible.length">
-        <i class="fas fa-stream fs-2 mb-3 d-block opacity-25"></i>
-        Aucun log pour le moment.
-      </div>
-      <div class="list-group-item px-4 py-3 d-flex gap-3 align-items-start" *ngFor="let log of visible">
-        <span class="badge rounded-pill text-uppercase level"
-              [ngClass]="'bg-' + tone(log.level) + '-subtle text-' + tone(log.level)">{{ normalize(log.level) }}</span>
-        <div class="flex-grow-1 small text-dark message">{{ log.message }}</div>
-        <span class="small text-muted text-nowrap">{{ log.timestamp | date:'d MMM, HH:mm:ss' }}</span>
+  <!-- FILTRES -->
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <button type="button" class="btn btn-sm rounded-pill px-3"
+            [ngClass]="level === '' ? 'btn-dark' : 'btn-light border'" (click)="selectLevel('')">Tous</button>
+    <button type="button" class="btn btn-sm rounded-pill px-3 text-capitalize" *ngFor="let item of levels"
+            [ngClass]="level === item ? 'btn-dark' : 'btn-light border'" (click)="selectLevel(item)">{{ item }}</button>
+    <div class="ms-md-auto search-box" *ngIf="tab === 'history'">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+        <input type="search" class="form-control" placeholder="Rechercher dans les messages (ex. pi_, CMD-…)"
+               [(ngModel)]="historyQuery" (ngModelChange)="onSearch()">
       </div>
     </div>
   </div>
+
+  <!-- EN DIRECT -->
+  <div class="card border-0 shadow-sm rounded-3 overflow-hidden" *ngIf="tab === 'live'">
+    <div class="list-group list-group-flush">
+      <div class="list-group-item text-center text-muted py-5" *ngIf="!visibleLive.length">
+        <i class="fas fa-stream fs-2 mb-3 d-block opacity-25"></i>
+        Aucun log dans les 5 dernières minutes. Les plus anciens sont dans l'onglet Historique.
+      </div>
+      <ng-container *ngFor="let log of visibleLive">
+        <ng-container *ngTemplateOutlet="logRow; context: { $implicit: log }"></ng-container>
+      </ng-container>
+    </div>
+  </div>
+
+  <!-- HISTORIQUE -->
+  <div class="card border-0 shadow-sm rounded-3 overflow-hidden" *ngIf="tab === 'history'">
+    <div class="list-group list-group-flush">
+      <div class="list-group-item text-center text-danger py-4" *ngIf="historyError">
+        Impossible de charger l'historique.
+        <button type="button" class="btn btn-link btn-sm" (click)="loadHistory()">Réessayer</button>
+      </div>
+      <div class="list-group-item text-center text-muted py-5" *ngIf="!historyError && !historyLoading && !history.length">
+        <i class="fas fa-archive fs-2 mb-3 d-block opacity-25"></i>
+        Aucun log archivé ne correspond.
+      </div>
+      <ng-container *ngFor="let log of history">
+        <ng-container *ngTemplateOutlet="logRow; context: { $implicit: log }"></ng-container>
+      </ng-container>
+    </div>
+    <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top small" *ngIf="history.length">
+      <span class="text-muted">{{ history.length }} sur {{ historyTotal }}</span>
+      <button type="button" class="btn btn-light border btn-sm" *ngIf="canLoadMore"
+              [disabled]="historyLoading" (click)="loadHistory(true)">
+        <i class="fas fa-spinner fa-spin me-1" *ngIf="historyLoading"></i> Charger plus
+      </button>
+    </div>
+  </div>
 </div>
+
+<ng-template #logRow let-log>
+  <div class="list-group-item px-4 py-3 d-flex gap-3 align-items-start">
+    <span class="badge rounded-pill text-uppercase level"
+          [ngClass]="'bg-' + tone(log.level) + '-subtle text-' + tone(log.level)">{{ normalize(log.level) }}</span>
+    <div class="flex-grow-1 small text-dark message">{{ log.message }}</div>
+    <span class="small text-muted text-nowrap">{{ log.timestamp | date:'d MMM y, HH:mm:ss' }}</span>
+  </div>
+</ng-template>

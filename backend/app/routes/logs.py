@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 from typing import List
 from pydantic import BaseModel
-from fastapi import APIRouter
+import re
+from fastapi import APIRouter, Query
 from app.config import db, redis_client
 from app.routes.websockets import notify_log_clients
 
@@ -22,12 +23,12 @@ async def create_log(log: LogEntry):
     log_entry = {
         "level": log.level,
         "message": log.message,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
     
     # Stocker le log dans Redis sous la clé "recent_logs"
     redis_client.lpush("recent_logs", json.dumps(log_entry))
-    redis_client.ltrim("recent_logs", 0, 99)  # Garde les 100 derniers logs
+    redis_client.ltrim("recent_logs", 0, 1999)  # Borne de sécurité entre deux archivages (5 min)
 
     # Stocker les logs critiques dans Redis (pour la clé "critical_logs")
     if log.level in ["error", "critical"]:
@@ -47,13 +48,13 @@ async def create_log(log: LogEntry):
 #         log_entry = {
 #             "level": log.level,
 #             "message": log.message,
-#             "timestamp": datetime.utcnow().isoformat()  # Conversion datetime en string
+#             "timestamp": datetime.now(timezone.utc).isoformat()  # Conversion datetime en string
 #         }
 #         log_entries.append(log_entry)
         
 #         # Stocker le log dans Redis sous la clé "recent_logs" (pour les logs récents)
 #         redis_client.lpush("recent_logs", json.dumps(log_entry))
-#         redis_client.ltrim("recent_logs", 0, 99)  # Garde les 100 derniers logs
+#         redis_client.ltrim("recent_logs", 0, 1999)  # Borne de sécurité entre deux archivages (5 min)
         
 #         # Stocker les logs critiques dans Redis (pour la clé "critical_logs")
 #         if log.level in ["error", "critical"]:
@@ -74,6 +75,29 @@ def get_recent_logs():
     logs = [json.loads(log) for log in redis_client.lrange("recent_logs", 0, -1)]
     return {"logs": logs}
 
+@router.get("/history")
+def get_log_history(
+    level: str | None = None,
+    q: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=50, ge=1, le=200),
+    skip: int = Query(default=0, ge=0),
+):
+    """Logs archivés dans MongoDB (toutes les 5 min par Celery), du plus récent au plus ancien."""
+    query: dict = {"message": {"$exists": True}}
+    if level:
+        levels = ["error", "critical"] if level.lower() == "error" else [level.lower()]
+        query["level"] = {"$in": levels + [lvl.upper() for lvl in levels]}
+    if q:
+        query["message"] = {"$regex": re.escape(q), "$options": "i"}
+    total = db.logs.count_documents(query)
+    rows = db.logs.find(query, {"_id": 0}).sort("timestamp", -1).skip(skip).limit(limit)
+    logs = [
+        {**row, "timestamp": row["timestamp"].isoformat() if isinstance(row.get("timestamp"), datetime) else row.get("timestamp")}
+        for row in rows
+    ]
+    return {"total": total, "logs": logs}
+
+
 @router.get("/critical")
 def get_critical_logs():
     logs = [json.loads(log) for log in redis_client.lrange("critical_logs", 0, -1)]
@@ -87,7 +111,7 @@ class RedisLogHandler(logging.Handler):
         log_entry = {
             "level": record.levelname,
             "message": self.format(record),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         # Envoyer le log à Redis
         redis_client.lpush("recent_logs", json.dumps(log_entry))

@@ -1,6 +1,5 @@
 """API publique de la passerelle de paiement (/v1), utilisée par le backend BazarStore."""
 
-import hmac
 from html import escape
 from typing import Literal
 
@@ -8,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field, HttpUrl
 
-from app.config import GATEWAY_API_KEY, GATEWAY_MERCHANT_NAME, logger
+from app.config import GATEWAY_MERCHANTS, logger
 from app.routes.ml_model import predict_by_currency
 from app.routes.websockets import notify_payment_clients
 from app.services import gateway_service as gateway
@@ -17,11 +16,15 @@ from app.tasks import log_to_redis
 router = APIRouter()
 
 
-def require_merchant(authorization: str | None = Header(default=None)) -> None:
-    if not GATEWAY_API_KEY:
+def require_merchant(authorization: str | None = Header(default=None)) -> str:
+    """Nom du projet authentifié par sa clé API (`Authorization: Bearer <clé>`)."""
+    if not GATEWAY_MERCHANTS:
         raise HTTPException(status_code=503, detail="Passerelle non configurée")
-    if not authorization or not hmac.compare_digest(authorization, f"Bearer {GATEWAY_API_KEY}"):
+    scheme, _, key = (authorization or "").partition(" ")
+    merchant = gateway.merchant_for_key(key) if scheme == "Bearer" and key else None
+    if merchant is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    return merchant["name"]
 
 
 class IntentLine(BaseModel):
@@ -52,13 +55,16 @@ async def _publish(intent: dict, background: BackgroundTasks) -> None:
         background.add_task(gateway.deliver_webhook, intent)
 
 
-@router.post("/payment-intents", status_code=201, dependencies=[Depends(require_merchant)])
-async def create_payment_intent(payload: IntentIn, background: BackgroundTasks) -> dict:
+@router.post("/payment-intents", status_code=201)
+async def create_payment_intent(
+    payload: IntentIn, background: BackgroundTasks, merchant: str = Depends(require_merchant)
+) -> dict:
     lines = [line.model_dump() for line in payload.lines]
     if lines and sum(line["unit_amount"] * line["quantity"] for line in lines) != payload.amount:
         raise HTTPException(status_code=422, detail="La somme des lignes ne correspond pas au montant")
     try:
         intent = gateway.create_intent(
+            merchant=merchant,
             merchant_reference=payload.merchant_reference,
             amount=payload.amount,
             currency=payload.currency,
@@ -76,9 +82,12 @@ async def create_payment_intent(payload: IntentIn, background: BackgroundTasks) 
     return gateway.public_intent(intent)
 
 
-@router.get("/payment-intents/{intent_id}", dependencies=[Depends(require_merchant)])
-async def read_payment_intent(intent_id: str, background: BackgroundTasks) -> dict:
-    intent = gateway.get_intent(intent_id)
+@router.get("/payment-intents/{intent_id}")
+async def read_payment_intent(
+    intent_id: str, background: BackgroundTasks, merchant: str = Depends(require_merchant)
+) -> dict:
+    # Un projet ne voit jamais les intentions d'un autre projet (404, pas 403).
+    intent = gateway.get_intent(intent_id, merchant)
     if intent is None:
         raise HTTPException(status_code=404, detail="Intention introuvable")
     try:
@@ -139,7 +148,7 @@ def simulator_page(intent_id: str):
     if intent["status"] != "pending":
         return RedirectResponse(intent["success_url" if intent["status"] == "success" else "cancel_url"], 303)
     return SIMULATOR_PAGE.format(
-        merchant=escape(GATEWAY_MERCHANT_NAME),
+        merchant=escape(intent["source"]),
         description=escape(intent.get("description") or intent["user_id"]),
         amount=f"{intent['amount']:,}".replace(",", " "),
     )

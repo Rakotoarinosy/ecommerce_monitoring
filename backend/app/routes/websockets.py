@@ -40,7 +40,7 @@ async def websocket_logs_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            logs = redis_client.lrange("recent_logs", 0, 9)  # Récupérer les 10 derniers logs
+            logs = redis_client.lrange("recent_logs", 0, 49)  # 50 plus récents (non encore archivés)
             logs = [json.loads(log) for log in logs]
             await websocket.send_json({"logs": logs})
             await asyncio.sleep(1)  # 🔄 Rafraîchissement automatique

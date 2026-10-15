@@ -56,8 +56,9 @@ export class PaymentListComponent implements OnInit {
     return (parts.slice(0, 2).map((part) => part[0]).join('') || '#').toUpperCase();
   }
 
+  /** Paiement venu d'un projet branché sur la passerelle (BazarStore ou autre). */
   isFromShop(payment: any): boolean {
-    return payment?.source === 'BazarStore';
+    return !!payment?.source && payment.source !== 'Monitoring';
   }
 
   isAnomaly(payment: any): boolean {

@@ -2,7 +2,7 @@ from app.config import db, redis_client
 from app.celery_worker import celery
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 import sys
 sys.path.insert(0, "/app/app/ml")
 from app.ml.train_model import train_and_log
@@ -14,13 +14,13 @@ logger = logging.getLogger(__name__)
 def log_to_redis(message, level="info"):
     """Capture les logs et les stocke dans Redis."""
     log_entry = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "level": level,
         "message": message
     }
     
-    # Convertir le log en JSON et l'ajouter à la liste Redis
-    redis_client.rpush("recent_logs", json.dumps(log_entry))
+    # En tête de liste : la page « En direct » lit les plus récents en premier.
+    redis_client.lpush("recent_logs", json.dumps(log_entry))
 
 @celery.task(name="app.tasks.save_logs")
 def save_logs():
@@ -30,7 +30,11 @@ def save_logs():
         
         # log_to_redis("Début du processus d'enregistrement des logs", level="info")
         
-        logs = redis_client.lrange("recent_logs", 0, -1)
+        # Lecture + vidage atomiques : un log écrit pendant l'archivage n'est jamais perdu.
+        pipe = redis_client.pipeline(transaction=True)
+        pipe.lrange("recent_logs", 0, -1)
+        pipe.delete("recent_logs")
+        logs, _ = pipe.execute()
         if not logs:
             logger.info("⚠️ Aucun log à enregistrer.")
             return {"status": "no logs"}
@@ -38,13 +42,13 @@ def save_logs():
         log_entries = [json.loads(log) for log in logs]
         logger.info(f"📌 {len(log_entries)} logs récupérés de Redis.")
 
-        # Insérer les logs dans MongoDB
-        db.logs.insert_many(log_entries)
-        logger.info(f"✅ {len(log_entries)} logs enregistrés dans MongoDB.")
-
-        # Nettoyer Redis après insertion
-        redis_client.delete("recent_logs")
-        logger.info("🧹 Redis nettoyé après insertion des logs.")
+        try:
+            db.logs.insert_many(log_entries)
+        except Exception:
+            # MongoDB indisponible : on remet les logs dans Redis pour le prochain passage.
+            redis_client.rpush("recent_logs", *logs)
+            raise
+        logger.info(f"✅ {len(log_entries)} logs archivés dans MongoDB.")
 
         return {"status": "success", "logs_saved": len(log_entries)}
     

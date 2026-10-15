@@ -25,6 +25,8 @@ def setup_database():
         partialFilterExpression={"id": {"$type": "string"}},
     )
     db.payments.create_index([("source", 1), ("source_order_id", 1)], name="merchant_order")
+    # Historique des logs : tri par date.
+    db.logs.create_index([("timestamp", -1)], name="logs_by_time")
     
     if "logs" not in collections:
         logger.info("✅ Création de la collection 'logs' avec un document initial...")

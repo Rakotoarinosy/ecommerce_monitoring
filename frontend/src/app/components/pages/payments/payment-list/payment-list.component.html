@@ -110,7 +110,7 @@
               <td class="ps-4">
                 <span class="source-badge" [class.shop]="isFromShop(payment)">
                   <i class="fas" [ngClass]="isFromShop(payment) ? 'fa-store' : 'fa-chart-line'"></i>
-                  {{ isFromShop(payment) ? 'BazarStore' : 'Monitoring' }}
+                  {{ isFromShop(payment) ? payment.source : 'Monitoring' }}
                 </span>
                 <div class="payment-ref mt-1">
                   {{ payment.order_reference || ('#' + shortId(payment)) }}
@@ -199,7 +199,7 @@
         <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
           <div class="min-w-0">
             <span class="source-badge" [class.shop]="isFromShop(payment)">
-              {{ isFromShop(payment) ? 'BazarStore' : 'Monitoring' }}
+              {{ isFromShop(payment) ? payment.source : 'Monitoring' }}
             </span>
             <div class="payment-ref mt-1">{{ payment.order_reference || ('#' + shortId(payment)) }}</div>
           </div>

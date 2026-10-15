@@ -18,11 +18,9 @@ import httpx
 import stripe
 
 from app.config import (
-    GATEWAY_MERCHANT_NAME,
-    GATEWAY_MERCHANT_WEBHOOK_URL,
+    GATEWAY_MERCHANTS,
     GATEWAY_PROVIDER,
     GATEWAY_PUBLIC_URL,
-    GATEWAY_WEBHOOK_SECRET,
     db,
     logger,
 )
@@ -38,6 +36,19 @@ EVENT_TYPES = {
 
 class ProviderError(Exception):
     pass
+
+
+def merchant_for_key(api_key: str) -> dict | None:
+    """Projet correspondant à une clé API (comparaison à temps constant)."""
+    found = None
+    for merchant in GATEWAY_MERCHANTS:
+        if hmac.compare_digest(api_key.encode(), merchant["api_key"].encode()):
+            found = merchant
+    return found
+
+
+def merchant_named(name: str) -> dict | None:
+    return next((m for m in GATEWAY_MERCHANTS if m["name"] == name), None)
 
 
 def _now() -> datetime:
@@ -131,6 +142,7 @@ def _stripe_status(session_id: str) -> str | None:
 
 def create_intent(
     *,
+    merchant: str,
     merchant_reference: str,
     amount: int,
     currency: str,
@@ -146,12 +158,12 @@ def create_intent(
     intent_id = f"pi_{secrets.token_hex(12)}"
     # Une relance clôt l'intention précédente de la même commande (une seule payable à la fois).
     db.payments.update_many(
-        {"source": GATEWAY_MERCHANT_NAME, "source_order_id": merchant_reference, "status": "pending"},
+        {"source": merchant, "source_order_id": merchant_reference, "status": "pending"},
         {"$set": {"status": "cancelled", "updated_at": now}},
     )
     intent = {
         "id": intent_id,
-        "source": GATEWAY_MERCHANT_NAME,
+        "source": merchant,
         "source_order_id": merchant_reference,
         # Colonne historique « Utilisateur » : nom du client, sinon le libellé de la commande.
         "user_id": customer_name or description,
@@ -179,8 +191,12 @@ def create_intent(
     return intent
 
 
-def get_intent(intent_id: str) -> dict | None:
-    return db.payments.find_one({"id": intent_id, "source": GATEWAY_MERCHANT_NAME}, {"_id": 0})
+def get_intent(intent_id: str, merchant: str | None = None) -> dict | None:
+    """Intention de la passerelle ; avec `merchant`, seulement si elle appartient à ce projet."""
+    query = {"id": intent_id, "source_order_id": {"$exists": True}}
+    if merchant is not None:
+        query["source"] = merchant
+    return db.payments.find_one(query, {"_id": 0})
 
 
 def refresh_intent(intent: dict) -> dict:
@@ -234,17 +250,19 @@ def build_event(intent: dict) -> bytes:
 
 def deliver_webhook(intent: dict, attempts: int = 3) -> bool:
     """Envoi best-effort (tâche de fond) ; le marchand relit de toute façon l'intention."""
-    if not GATEWAY_MERCHANT_WEBHOOK_URL or not GATEWAY_WEBHOOK_SECRET:
+    merchant = merchant_named(intent["source"]) or {}
+    url, secret = merchant.get("webhook_url"), merchant.get("webhook_secret")
+    if not url or not secret:
         return False
     body = build_event(intent)
     for attempt in range(1, attempts + 1):
         try:
             response = httpx.post(
-                GATEWAY_MERCHANT_WEBHOOK_URL,
+                url,
                 content=body,
                 headers={
                     "Content-Type": "application/json",
-                    "X-Gateway-Signature": sign(body, GATEWAY_WEBHOOK_SECRET),
+                    "X-Gateway-Signature": sign(body, secret),
                 },
                 timeout=5.0,
             )
