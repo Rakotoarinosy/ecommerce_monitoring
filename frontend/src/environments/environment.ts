@@ -2,5 +2,5 @@ export const environment = {
   production: false,
   // apiUrl: 'http://backend:8000',
   apiUrl: 'http://localhost:8011',
-  wsUrl: 'wss://localhost:8011'
+  wsUrl: 'ws://localhost:8011'
 };
