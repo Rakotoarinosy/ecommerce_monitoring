@@ -6,10 +6,11 @@ WORKDIR /app
 
 # Copier les fichiers nécessaires
 COPY requirements.txt ./
-COPY app/ ./app/
 
-# Installer les dépendances
+# Installer les dépendances (avant le code : une modification de app/ ne réinstalle rien)
 RUN pip install --default-timeout=100 --no-cache-dir -r requirements.txt
+
+COPY app/ ./app/
 
 # Exposer le port de l'API
 EXPOSE 8011
